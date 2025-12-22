@@ -1,0 +1,8 @@
+date,provider,service,amountEUR,currency
+2024-12-01,AWS,EC2,150.50,EUR
+2024-12-02,Azure,Storage,75.25,EUR
+2024-12-03,GCP,Compute,200.00,USD
+2024-12-04,AWS,S3,45.75,EUR
+2024-12-05,Other,CDN,120.00,EUR
+2024-12-10,GCP,BigQuery,300.50,EUR
+

@@ -1,0 +1,140 @@
+import 'dotenv/config'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+// Fonction utilitaire pour envoyer un message Telegram
+async function sendTelegramMessage(
+  botToken: string,
+  chatId: string,
+  message: string
+): Promise<boolean> {
+  try {
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'HTML',
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error(`Telegram API error: ${response.status}`, errorData)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('Error sending Telegram message:', error)
+    return false
+  }
+}
+
+// Formater un message d'alerte
+function formatAlertMessage(
+  orgName: string,
+  thresholdEUR: number,
+  totalEUR: number,
+  windowDays: number
+): string {
+  return `🚨 <b>Alert Triggered</b>
+
+<b>Organization:</b> ${orgName}
+<b>Rule:</b> ${thresholdEUR.toFixed(2)} EUR threshold
+<b>Amount:</b> ${totalEUR.toFixed(2)} EUR
+<b>Period:</b> Last ${windowDays} days`
+}
+
+async function checkAlerts() {
+  console.log('Checking alerts...')
+
+  // Récupérer toutes les organisations avec leur config Telegram
+  const organizations = await prisma.organization.findMany({
+    include: {
+      alertRules: true,
+    },
+  })
+
+  for (const org of organizations) {
+    for (const rule of org.alertRules) {
+      // Calculer le total des windowDays derniers jours
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - rule.windowDays)
+      startDate.setHours(0, 0, 0, 0)
+
+      const result = await prisma.costRecord.aggregate({
+        where: {
+          orgId: org.id,
+          date: { gte: startDate },
+        },
+        _sum: {
+          amountEUR: true,
+        },
+      })
+
+      const total = result._sum.amountEUR || 0
+
+      // Si dépassement et pas déjà triggered (passage false->true)
+      if (total > rule.thresholdEUR && !rule.triggered) {
+        await prisma.alertRule.update({
+          where: { id: rule.id },
+          data: {
+            triggered: true,
+            triggeredAt: new Date(),
+          },
+        })
+
+        console.log(
+          `✓ Alert rule triggered for "${org.name}": ${total.toFixed(2)} EUR > ${rule.thresholdEUR.toFixed(2)} EUR (${rule.windowDays} days)`
+        )
+
+        // Envoyer notification Telegram UNIQUEMENT lors du passage false->true
+        if (org.telegramBotToken && org.telegramChatId) {
+          const message = formatAlertMessage(
+            org.name,
+            rule.thresholdEUR,
+            total,
+            rule.windowDays
+          )
+          const sent = await sendTelegramMessage(
+            org.telegramBotToken,
+            org.telegramChatId,
+            message
+          )
+          if (sent) {
+            console.log(`  ✓ Telegram notification sent for "${org.name}"`)
+          } else {
+            console.log(`  ⚠ Failed to send Telegram notification for "${org.name}"`)
+          }
+        } else {
+          console.log(`  ℹ Telegram not configured for "${org.name}", skipping notification`)
+        }
+      } else if (total > rule.thresholdEUR && rule.triggered) {
+        console.log(
+          `  Alert rule already triggered for "${org.name}": ${total.toFixed(2)} EUR > ${rule.thresholdEUR.toFixed(2)} EUR`
+        )
+      } else {
+        console.log(
+          `  Alert rule OK for "${org.name}": ${total.toFixed(2)} EUR <= ${rule.thresholdEUR.toFixed(2)} EUR (${rule.windowDays} days)`
+        )
+      }
+    }
+  }
+
+  console.log('Done checking alerts.')
+}
+
+checkAlerts()
+  .catch((e) => {
+    console.error('Error:', e)
+    process.exit(1)
+  })
+  .finally(async () => {
+    await prisma.$disconnect()
+  })

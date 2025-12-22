@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  passwordHash String
+  createdAt    DateTime    @default(now())
+  
+  memberships Membership[]
+}
+
+model Organization {
+  id               String      @id @default(cuid())
+  name             String
+  budgetMonthlyEUR Float?
+  telegramChatId   String?
+  telegramBotToken String?
+  demoDataLoadedAt DateTime?
+  onboardingCompletedAt DateTime?
+  createdAt        DateTime    @default(now())
+  
+  memberships  Membership[]
+  costRecords  CostRecord[]
+  alertRules   AlertRule[]
+  invitations  Invitation[]
+  cloudAccounts CloudAccount[]
+}
+
+model Membership {
+  id             String       @id @default(cuid())
+  userId         String
+  orgId          String
+  role           String       @default("member") // "owner" or "member"
+  createdAt      DateTime     @default(now())
+  
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, orgId])
+  @@index([orgId])
+}
+
+model CostRecord {
+  id             String       @id @default(cuid())
+  orgId          String
+  date           DateTime
+  provider       String
+  service        String
+  amountEUR      Float
+  currency       String
+  createdAt      DateTime     @default(now())
+  
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  
+  @@index([orgId])
+  @@index([orgId, date])
+}
+
+model AlertRule {
+  id             String       @id @default(cuid())
+  orgId          String
+  thresholdEUR   Float
+  windowDays     Int          @default(7)
+  triggered      Boolean      @default(false)
+  triggeredAt    DateTime?
+  createdAt      DateTime     @default(now())
+  
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  
+  @@index([orgId])
+}
+
+model Invitation {
+  id         String    @id @default(cuid())
+  token      String    @unique
+  email      String
+  orgId      String
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+  
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  
+  @@index([orgId])
+  @@index([token])
+}
+
+model Lead {
+  id                     String    @id @default(cuid())
+  email                  String
+  company                String
+  role                   String?
+  cloudProvider          String?
+  monthlyCloudSpendRange String?
+  message                String?
+  archived               Boolean   @default(false)
+  createdAt              DateTime  @default(now())
+  
+  @@index([email])
+  @@index([createdAt])
+  @@index([archived])
+}
+
+model CloudAccount {
+  id               String   @id @default(cuid())
+  orgId            String
+  provider         String   // AWS, GCP, Azure, Other
+  accountName      String
+  accountIdentifier String? // Optional: AWS Account ID, GCP Project ID, etc.
+  status           String   @default("pending") // pending, active, disabled
+  notes            String?
+  createdAt        DateTime @default(now())
+  
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  
+  @@index([orgId])
+  @@index([status])
+}
