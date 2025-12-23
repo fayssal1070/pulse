@@ -22,8 +22,14 @@ export default function LandingPage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link
-                  href="/contact?action=demo"
+                  href="/demo"
                   className="px-8 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Try Demo
+                </Link>
+                <Link
+                  href="/contact?action=demo"
+                  className="px-8 py-3 bg-white text-blue-600 font-medium rounded-md border-2 border-blue-600 hover:bg-blue-50 transition-colors"
                 >
                   Request Demo
                 </Link>
@@ -179,8 +185,14 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                href="/contact?action=demo"
+                href="/demo"
                 className="px-8 py-3 bg-white text-blue-600 font-medium rounded-md hover:bg-gray-100 transition-colors"
+              >
+                Try Demo
+              </Link>
+              <Link
+                href="/contact?action=demo"
+                className="px-8 py-3 bg-white text-blue-600 font-medium rounded-md border-2 border-white hover:bg-gray-100 transition-colors"
               >
                 Request Demo
               </Link>
