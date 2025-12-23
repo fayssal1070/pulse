@@ -10,6 +10,7 @@ import {
 import DemoModeBadge from '@/components/demo-mode-badge'
 import DemoActionDisabled from '@/components/demo-action-disabled'
 import DemoEarlyAccessForm from '@/components/demo-early-access-form'
+import DemoTour from '@/components/demo-tour'
 
 export default function DemoPage() {
   const monthlyTotal = getCurrentMonthTotal()
@@ -118,7 +119,7 @@ export default function DemoPage() {
           </div>
 
           {/* 12 Month Trend */}
-          <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <div id="demo-monthly-trend" className="bg-white rounded-lg shadow p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">12-Month Spending Trend</h3>
             <div className="space-y-3">
               {monthlyTrend.map((month, idx) => {
@@ -150,7 +151,7 @@ export default function DemoPage() {
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-6">
             {/* Top 5 Cost Drivers */}
-            <div className="bg-white rounded-lg shadow p-6">
+            <div id="demo-cost-drivers" className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Top 5 Cost Drivers</h3>
               {topCostDrivers.length === 0 ? (
                 <p className="text-gray-500 text-sm">No costs recorded</p>
@@ -176,7 +177,7 @@ export default function DemoPage() {
             </div>
 
             {/* Recent Alerts */}
-            <div className="bg-white rounded-lg shadow p-6">
+            <div id="demo-alerts" className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Alerts</h3>
               {activeAlerts.length === 0 ? (
                 <p className="text-gray-500 text-sm">No active alerts</p>
@@ -288,7 +289,7 @@ export default function DemoPage() {
           </div>
 
           {/* Get Early Access Form */}
-          <div className="mt-8 mb-6">
+          <div id="demo-early-access" className="mt-8 mb-6">
             <DemoEarlyAccessForm />
           </div>
 
@@ -315,6 +316,9 @@ export default function DemoPage() {
           </div>
         </div>
       </main>
+
+      {/* Guided Tour */}
+      <DemoTour />
     </div>
   )
 }

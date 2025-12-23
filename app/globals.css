@@ -24,3 +24,10 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Demo Tour Highlight */
+.demo-tour-highlight {
+  position: relative;
+  z-index: 10001 !important;
+  transition: all 0.3s ease;
+}
