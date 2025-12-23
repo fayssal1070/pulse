@@ -103,6 +103,12 @@ export default async function OrganizationPage({
             <h2 className="text-2xl font-bold text-gray-900">{organization.name}</h2>
             <div className="space-x-2">
               <Link
+                href={`/organizations/${id}/cloud-accounts`}
+                className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700"
+              >
+                Cloud Accounts
+              </Link>
+              <Link
                 href={`/organizations/${id}/import`}
                 className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
               >

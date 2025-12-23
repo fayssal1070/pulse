@@ -6,15 +6,34 @@ import { prisma } from '@/lib/prisma'
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth()
-    const { provider, accountName, accountIdentifier, notes } = await request.json()
+    const {
+      provider,
+      accountName,
+      accountIdentifier,
+      connectionType,
+      roleArn,
+      externalId,
+      organizationId,
+      notes,
+    } = await request.json()
 
-    // Récupérer l'organisation active
-    const orgId = await getActiveOrganizationId(user.id)
+    // Use provided organizationId or get active org
+    let orgId = organizationId
     if (!orgId) {
-      return NextResponse.json(
-        { error: 'No active organization found. Please select an organization first.' },
-        { status: 400 }
-      )
+      orgId = await getActiveOrganizationId(user.id)
+      if (!orgId) {
+        return NextResponse.json(
+          { error: 'No active organization found. Please select an organization first.' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Verify user has access to this organization
+    const { getUserOrganizations } = await import('@/lib/organizations')
+    const organizations = await getUserOrganizations(user.id)
+    if (!organizations.find((o) => o.id === orgId)) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
     if (!provider || !accountName) {
@@ -33,14 +52,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // For AWS Cost Explorer, require roleArn and externalId
+    if (connectionType === 'COST_EXPLORER' && provider === 'AWS') {
+      if (!roleArn || !externalId) {
+        return NextResponse.json(
+          { error: 'Role ARN and External ID are required for AWS Cost Explorer' },
+          { status: 400 }
+        )
+      }
+    }
+
     const cloudAccount = await prisma.cloudAccount.create({
       data: {
         orgId,
         provider,
         accountName: accountName.trim(),
         accountIdentifier: accountIdentifier?.trim() || null,
+        connectionType: connectionType || null,
+        roleArn: roleArn?.trim() || null,
+        externalId: externalId?.trim() || null,
         notes: notes?.trim() || null,
-        status: 'pending',
+        status: connectionType === 'COST_EXPLORER' ? 'pending' : 'pending',
       },
     })
 
