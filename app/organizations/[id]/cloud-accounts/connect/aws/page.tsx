@@ -33,22 +33,20 @@ export default function ConnectAWSPage() {
     setExternalId(generateUUID())
   }, [])
 
-  // Get PULSE account ID (for Trust Policy Principal)
-  // This should be set in environment variables
-  // For now, we'll fetch it from an API endpoint or use a placeholder
-  const [pulseAccountId, setPulseAccountId] = useState<string>('YOUR_PULSE_AWS_ACCOUNT_ID')
+  // Get PULSE Principal ARN (for Trust Policy Principal)
+  const [pulsePrincipalArn, setPulsePrincipalArn] = useState<string>('arn:aws:iam::298199649603:root')
 
   useEffect(() => {
-    // Fetch PULSE AWS account ID from API
+    // Fetch PULSE AWS Principal ARN from API
     fetch('/api/aws/pulse-account-id')
       .then((res) => res.json())
       .then((data) => {
-        if (data.accountId) {
-          setPulseAccountId(data.accountId)
+        if (data.principalArn) {
+          setPulsePrincipalArn(data.principalArn)
         }
       })
       .catch(() => {
-        // Keep placeholder if API fails
+        // Use default if API fails
       })
   }, [])
 
@@ -58,7 +56,7 @@ export default function ConnectAWSPage() {
       {
         Effect: 'Allow',
         Principal: {
-          AWS: `arn:aws:iam::${pulseAccountId}:root`,
+          AWS: pulsePrincipalArn,
         },
         Action: 'sts:AssumeRole',
         Condition: {
@@ -294,8 +292,7 @@ export default function ConnectAWSPage() {
                 <li>Delete the default policy</li>
                 <li>Copy the Trust Policy JSON below and paste it into the editor</li>
                 <li>
-                  <strong>Important:</strong> Replace <code className="bg-gray-100 px-1 rounded">YOUR_PULSE_AWS_ACCOUNT_ID</code> with
-                  your PULSE AWS account ID (if you have it) or contact support
+                  <strong>Important:</strong> The Trust Policy is pre-configured with the correct PULSE AWS account. Do not modify the Principal ARN.
                 </li>
                 <li>Click "Next"</li>
               </ol>
@@ -455,14 +452,13 @@ export default function ConnectAWSPage() {
 
         {/* Help Section */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Need Help?</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Security Note</h3>
           <p className="text-gray-700 mb-2">
-            If you don't have your PULSE AWS account ID, you can:
+            The Trust Policy uses a specific PULSE AWS account ID for maximum security. This ensures only PULSE can assume the role, even if the External ID is compromised.
           </p>
-          <ul className="list-disc list-inside text-gray-700 space-y-1">
-            <li>Contact support to get your account ID</li>
-            <li>Or use a more permissive trust policy (less secure) - contact support for details</li>
-          </ul>
+          <p className="text-gray-700 text-sm">
+            If you need assistance, contact PULSE support.
+          </p>
         </div>
       </main>
     </div>

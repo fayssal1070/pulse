@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-  // Return PULSE AWS account ID from environment variable
-  // This should be set in Vercel environment variables
-  const accountId = process.env.AWS_ACCOUNT_ID || null
+  // Return PULSE AWS Principal ARN from environment variable
+  // Set in Vercel: PULSE_AWS_PRINCIPAL_ARN = arn:aws:iam::298199649603:root
+  const principalArn = process.env.PULSE_AWS_PRINCIPAL_ARN || 'arn:aws:iam::298199649603:root'
 
-  return NextResponse.json({ accountId })
+  return NextResponse.json({ principalArn })
 }
 
