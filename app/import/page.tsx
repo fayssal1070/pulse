@@ -127,6 +127,30 @@ function ImportPageContent() {
                 </div>
               )}
 
+              {/* CSV Template & Sample Downloads */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Need help getting started?</h3>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <a
+                    href="/api/csv/template"
+                    download="pulse-import-template.csv"
+                    className="px-4 py-2 bg-white text-blue-600 font-medium rounded-md border-2 border-blue-600 hover:bg-blue-50 transition-colors text-center text-sm"
+                  >
+                    📥 Download CSV Template
+                  </a>
+                  <a
+                    href="/api/csv/sample"
+                    download="pulse-sample-data.csv"
+                    className="px-4 py-2 bg-white text-blue-600 font-medium rounded-md border-2 border-blue-600 hover:bg-blue-50 transition-colors text-center text-sm"
+                  >
+                    📊 Download Sample CSV
+                  </a>
+                </div>
+                <p className="mt-3 text-xs text-gray-600">
+                  The sample CSV contains 45 realistic records you can import immediately to see your dashboard populated.
+                </p>
+              </div>
+
               <div>
                 <label htmlFor="file" className="block text-sm font-medium text-gray-700 mb-2">
                   CSV File
@@ -139,16 +163,23 @@ function ImportPageContent() {
                   onChange={handleFileChange}
                   className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                 />
-                <p className="mt-2 text-sm text-gray-500">
-                  Required columns: <code className="bg-gray-100 px-1 rounded">date</code>,{' '}
-                  <code className="bg-gray-100 px-1 rounded">provider</code>,{' '}
-                  <code className="bg-gray-100 px-1 rounded">service</code>,{' '}
-                  <code className="bg-gray-100 px-1 rounded">amountEUR</code>,{' '}
-                  <code className="bg-gray-100 px-1 rounded">currency</code>
-                </p>
-                <p className="mt-1 text-xs text-gray-400">
-                  Date format: YYYY-MM-DD | Provider: AWS, GCP, Azure, or Other
-                </p>
+                <div className="mt-3 space-y-2">
+                  <p className="text-sm font-medium text-gray-700">Required columns:</p>
+                  <div className="flex flex-wrap gap-2">
+                    <code className="bg-gray-100 px-2 py-1 rounded text-xs">date</code>
+                    <code className="bg-gray-100 px-2 py-1 rounded text-xs">provider</code>
+                    <code className="bg-gray-100 px-2 py-1 rounded text-xs">service</code>
+                    <code className="bg-gray-100 px-2 py-1 rounded text-xs">amountEUR</code>
+                    <code className="bg-gray-100 px-2 py-1 rounded text-xs">currency</code>
+                  </div>
+                  <div className="mt-2 text-xs text-gray-600 space-y-1">
+                    <p>• <strong>date</strong>: Format YYYY-MM-DD (e.g., 2024-01-15)</p>
+                    <p>• <strong>provider</strong>: AWS, GCP, Azure, or Other</p>
+                    <p>• <strong>service</strong>: Service name (e.g., EC2, Compute Engine, Virtual Machines)</p>
+                    <p>• <strong>amountEUR</strong>: Cost amount as number (e.g., 150.50)</p>
+                    <p>• <strong>currency</strong>: EUR or USD</p>
+                  </div>
+                </div>
               </div>
 
               <div className="flex space-x-4">
