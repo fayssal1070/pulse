@@ -149,7 +149,8 @@ Dans Vercel, avant de déployer, ajouter toutes les variables d'environnement su
 |----------|-------------|---------|
 | `DATABASE_URL` | Connection string PostgreSQL (de Neon/Supabase) | `postgresql://user:pass@host/db?sslmode=require` |
 | `AUTH_SECRET` | Secret pour NextAuth (générer avec `openssl rand -base64 32`) | `votre-secret-aleatoire-32-caracteres` |
-| `NEXTAUTH_URL` | URL publique de l'application (sera mis à jour après déploiement) | `https://pulse-staging.vercel.app` |
+| `NEXTAUTH_URL` | **ORIGIN ONLY** (scheme + domain, NO path). Set only for Production with stable domain. For Preview, use `AUTH_TRUST_HOST=true` instead. | `https://pulse-staging.vercel.app` (Production only) |
+| `AUTH_TRUST_HOST` | Trust host header for preview deployments (URLs change per deploy). **REQUIRED for Preview environments.** | `true` |
 
 #### Variables Optionnelles (pour Telegram)
 
@@ -166,7 +167,12 @@ Dans Vercel, avant de déployer, ajouter toutes les variables d'environnement su
    - **Key** : Nom de la variable
    - **Value** : Valeur de la variable
    - **Environment** : Sélectionner `Production`, `Preview`, et `Development`
-4. ⚠️ **IMPORTANT** : Pour `NEXTAUTH_URL`, utiliser l'URL que Vercel générera (ex: `https://pulse-staging.vercel.app`)
+4. ⚠️ **IMPORTANT - NEXTAUTH_URL Configuration** :
+   - **NEXTAUTH_URL doit être SEULEMENT l'origine** (scheme + domain), **SANS chemin** (pas de `/organizations/new` ou autre path)
+   - **Format correct** : `https://pulse-staging.vercel.app` ✅
+   - **Format incorrect** : `https://pulse-staging.vercel.app/organizations/new` ❌
+   - **Pour Production** : Définir `NEXTAUTH_URL` avec un domaine stable (ex: `https://pulse-staging.vercel.app`)
+   - **Pour Preview** : **NE PAS définir `NEXTAUTH_URL`** (les URLs changent à chaque déploiement). Utiliser `AUTH_TRUST_HOST=true` à la place.
 
 #### Générer AUTH_SECRET
 
@@ -299,11 +305,27 @@ node prisma/seed.js
 
 ## 🔧 Configuration Post-Déploiement
 
-### Mettre à Jour NEXTAUTH_URL
+### Configuration NEXTAUTH_URL et AUTH_TRUST_HOST
+
+**⚠️ IMPORTANT : NEXTAUTH_URL doit être SEULEMENT l'origine (scheme + domain), SANS chemin**
+
+#### Pour Production (domaine stable)
 
 1. Dans Vercel, aller dans **Settings** > **Environment Variables**
-2. Mettre à jour `NEXTAUTH_URL` avec l'URL exacte de Vercel
-3. Redéployer le projet (Vercel le fera automatiquement)
+2. Ajouter/modifier `NEXTAUTH_URL` :
+   - **Valeur** : `https://pulse-staging.vercel.app` (ou votre domaine personnalisé)
+   - **Format** : Seulement l'origine, **PAS de chemin** (ex: ❌ `https://pulse-staging.vercel.app/organizations/new`)
+   - **Environnement** : Sélectionner **Production uniquement**
+3. Ajouter `AUTH_TRUST_HOST` :
+   - **Valeur** : `true`
+   - **Environnement** : Sélectionner **Production, Preview, Development**
+4. Redéployer le projet (Vercel le fera automatiquement)
+
+#### Pour Preview (URLs qui changent)
+
+1. **NE PAS définir `NEXTAUTH_URL` pour Preview** (les URLs changent à chaque déploiement)
+2. S'assurer que `AUTH_TRUST_HOST=true` est défini pour **Preview**
+3. Auth.js utilisera automatiquement l'URL du déploiement via le header `Host`
 
 ### Configurer un Domaine Personnalisé (Optionnel)
 
@@ -373,17 +395,23 @@ npx prisma generate
 - [ ] Ajouter `DATABASE_URL` : Connection string de Neon/Supabase
 - [ ] Générer `AUTH_SECRET` : `openssl rand -base64 32` (ou PowerShell équivalent)
 - [ ] Ajouter `AUTH_SECRET` dans Vercel
-- [ ] Ajouter `NEXTAUTH_URL` : `https://pulse-staging-xxx.vercel.app` (sera mis à jour après déploiement)
-- [ ] Sélectionner **Production**, **Preview**, et **Development** pour chaque variable
+- [ ] Ajouter `AUTH_TRUST_HOST` : `true` (sélectionner **Production, Preview, Development**)
+- [ ] Ajouter `NEXTAUTH_URL` : `https://pulse-staging-xxx.vercel.app` (seulement l'origine, **SANS chemin**)
+  - ⚠️ **IMPORTANT** : Sélectionner **Production uniquement** (pas Preview, car les URLs changent)
+  - Format correct : `https://pulse-staging-xxx.vercel.app` ✅
+  - Format incorrect : `https://pulse-staging-xxx.vercel.app/organizations/new` ❌
 
 #### 5. Déployer sur Vercel
 - [ ] Cliquer sur **Deploy**
 - [ ] Attendre la fin du build (2-3 minutes)
 - [ ] Noter l'URL générée : `https://pulse-staging-xxx.vercel.app`
 
-#### 6. Mettre à Jour NEXTAUTH_URL
+#### 6. Configurer NEXTAUTH_URL et AUTH_TRUST_HOST
 - [ ] Dans Vercel, aller dans **Settings** > **Environment Variables**
-- [ ] Mettre à jour `NEXTAUTH_URL` avec l'URL exacte de Vercel
+- [ ] Ajouter `AUTH_TRUST_HOST` : `true` (sélectionner **Production, Preview, Development**)
+- [ ] Ajouter `NEXTAUTH_URL` : `https://pulse-staging-xxx.vercel.app` (seulement l'origine, **SANS chemin**)
+  - ⚠️ Sélectionner **Production uniquement** (pas Preview)
+  - Format correct : `https://pulse-staging-xxx.vercel.app` ✅
 - [ ] Redéployer (Vercel le fera automatiquement)
 
 #### 7. Exécuter les Migrations Prisma

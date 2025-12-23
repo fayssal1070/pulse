@@ -38,7 +38,11 @@ export async function POST(request: NextRequest) {
     const invitation = await createInvitation(orgId, email)
 
     // Générer le lien d'invitation
-    const invitationLink = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/invitations/${invitation.token}`
+    // Extract origin only from NEXTAUTH_URL (no path), fallback to localhost for dev
+    const baseUrl = process.env.NEXTAUTH_URL
+      ? new URL(process.env.NEXTAUTH_URL).origin
+      : 'http://localhost:3000'
+    const invitationLink = `${baseUrl}/invitations/${invitation.token}`
 
     return NextResponse.json({
       invitation: {

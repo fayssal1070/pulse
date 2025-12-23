@@ -53,4 +53,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   // Supporte AUTH_SECRET ou NEXTAUTH_SECRET sans fuite de valeur
   secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  // Trust host for preview deployments (URLs change per deploy)
+  // NEXTAUTH_URL should only be set for Production with stable domain
+  trustHost: process.env.AUTH_TRUST_HOST === 'true',
 })
