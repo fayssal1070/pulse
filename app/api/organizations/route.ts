@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/session'
+import { requireAuth } from '@/lib/auth-helpers'
 import { createOrganization } from '@/lib/organizations'
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await requireAuth()
+    // Use NextAuth-based session, not the custom cookie session
+    const user = await requireAuth()
+    const userId = user.id
     const { name } = await request.json()
 
     if (!name) {

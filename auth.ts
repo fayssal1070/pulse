@@ -20,6 +20,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   pages: {
     signIn: '/login',
+    // Important: error doit pointer vers une page UI, pas une route API
+    error: '/auth/error',
   },
   callbacks: {
     async jwt({ token, user }) {
@@ -37,5 +39,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session
     },
   },
-  secret: process.env.AUTH_SECRET,
+  // Minimal logging using supported NextAuth v5 events
+  events: {
+    async signIn(message) {
+      console.log('[auth][signIn]', {
+        userId: message.user?.id,
+        email: message.user?.email,
+      })
+    },
+    async signOut() {
+      console.log('[auth][signOut]')
+    },
+  },
+  // Supporte AUTH_SECRET ou NEXTAUTH_SECRET sans fuite de valeur
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
 })

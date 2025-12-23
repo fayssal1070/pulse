@@ -1,40 +1,88 @@
+// Try .env.local first, then fall back to .env
+require('dotenv').config({ path: '.env.local' })
+require('dotenv').config() // This will load .env if .env.local doesn't exist
 const { PrismaClient } = require('@prisma/client')
+const { Pool } = require('pg')
+const { PrismaPg } = require('@prisma/adapter-pg')
 const bcrypt = require('bcryptjs')
 
-const prisma = new PrismaClient()
+// Pool PostgreSQL basé sur DATABASE_URL
+const connectionString = process.env.DATABASE_URL || ''
+const isLocal = connectionString.includes('localhost') || connectionString.includes('127.0.0.1')
+
+const pool = new Pool({
+  connectionString,
+  ...(isLocal ? {} : {
+    ssl: {
+      rejectUnauthorized: false, // Pour Supabase pooler
+    },
+  }),
+})
+
+const adapter = new PrismaPg(pool)
+
+const prisma = new PrismaClient({
+  adapter,
+})
 
 async function main() {
   console.log('🌱 Starting seed...')
 
-  // 1. Créer 1 user (owner)
+  // 1. Créer ou mettre à jour 1 user (owner)
   const passwordHash = await bcrypt.hash('password123', 10)
-  const user = await prisma.user.create({
-    data: {
+  const user = await prisma.user.upsert({
+    where: { email: 'owner@example.com' },
+    update: { passwordHash },
+    create: {
       email: 'owner@example.com',
       passwordHash,
     },
   })
-  console.log('✅ User created:', user.email)
+  console.log('✅ User created/updated:', user.email)
 
-  // 2. Créer 1 organization
-  const organization = await prisma.organization.create({
-    data: {
-      name: 'Acme Corp',
-    },
+  // 2. Créer ou mettre à jour 1 organization
+  let organization = await prisma.organization.findFirst({
+    where: { name: 'Acme Corp' },
   })
-  console.log('✅ Organization created:', organization.name)
+  if (!organization) {
+    organization = await prisma.organization.create({
+      data: {
+        name: 'Acme Corp',
+      },
+    })
+    console.log('✅ Organization created:', organization.name)
+  } else {
+    console.log('✅ Organization already exists:', organization.name)
+  }
 
-  // 3. Créer membership owner
-  const membership = await prisma.membership.create({
-    data: {
+  // 3. Créer ou mettre à jour membership owner
+  const membership = await prisma.membership.upsert({
+    where: {
+      userId_orgId: {
+        userId: user.id,
+        orgId: organization.id,
+      },
+    },
+    update: { role: 'owner' },
+    create: {
       userId: user.id,
       orgId: organization.id,
       role: 'owner',
     },
   })
-  console.log('✅ Membership created:', membership.role)
+  console.log('✅ Membership created/updated:', membership.role)
 
-  // 4. Créer 20 CostRecord répartis sur 30 jours
+  // 4. Supprimer les anciens CostRecords et créer 20 nouveaux répartis sur 30 jours
+  const existingCostRecords = await prisma.costRecord.count({
+    where: { orgId: organization.id },
+  })
+  if (existingCostRecords > 0) {
+    await prisma.costRecord.deleteMany({
+      where: { orgId: organization.id },
+    })
+    console.log(`🗑️  Deleted ${existingCostRecords} existing CostRecords`)
+  }
+
   const providers = ['AWS', 'Azure', 'GCP', 'DigitalOcean', 'Vercel']
   const services = ['EC2', 'S3', 'Lambda', 'Storage', 'Compute', 'Database', 'CDN', 'Functions']
   const currencies = ['EUR', 'USD', 'EUR', 'EUR', 'EUR'] // Principalement EUR
@@ -66,17 +114,34 @@ async function main() {
   }
   console.log(`✅ ${costRecords.length} CostRecords created`)
 
-  // 5. Créer 1 AlertRule avec seuil bas pour déclenchement
+  // 5. Créer ou mettre à jour 1 AlertRule avec seuil bas pour déclenchement
   // Seuil bas : 100 EUR sur 7 jours (facilement déclenchable avec 20 records)
-  const alertRule = await prisma.alertRule.create({
-    data: {
-      orgId: organization.id,
-      thresholdEUR: 100,
-      windowDays: 7,
-      triggered: false,
-    },
+  const existingAlertRule = await prisma.alertRule.findFirst({
+    where: { orgId: organization.id },
   })
-  console.log('✅ AlertRule created with threshold:', alertRule.thresholdEUR, 'EUR')
+  let alertRule
+  if (existingAlertRule) {
+    alertRule = await prisma.alertRule.update({
+      where: { id: existingAlertRule.id },
+      data: {
+        thresholdEUR: 100,
+        windowDays: 7,
+        triggered: false,
+        triggeredAt: null,
+      },
+    })
+    console.log('✅ AlertRule updated with threshold:', alertRule.thresholdEUR, 'EUR')
+  } else {
+    alertRule = await prisma.alertRule.create({
+      data: {
+        orgId: organization.id,
+        thresholdEUR: 100,
+        windowDays: 7,
+        triggered: false,
+      },
+    })
+    console.log('✅ AlertRule created with threshold:', alertRule.thresholdEUR, 'EUR')
+  }
 
   console.log('🌱 Seed completed successfully!')
 }
