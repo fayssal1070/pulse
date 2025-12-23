@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-helpers'
 import { getUserOrganizations } from '@/lib/organizations'
-import { setActiveOrganization } from '@/lib/active-org'
+import { setActiveOrganization, getActiveOrganizationId } from '@/lib/active-org'
+
+export async function GET() {
+  try {
+    const user = await requireAuth()
+    const orgId = await getActiveOrganizationId(user.id)
+    return NextResponse.json({ orgId })
+  } catch (error) {
+    console.error('Get active org error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
