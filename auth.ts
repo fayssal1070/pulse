@@ -2,7 +2,12 @@ import NextAuth from 'next-auth'
 import { credentialsProvider } from './lib/auth-provider'
 
 // Configuration complète avec providers (utilisée dans les routes API)
-export const { handlers, signIn, signOut, auth } = NextAuth({
+export const {
+  handlers: { GET, POST },
+  signIn,
+  signOut,
+  auth,
+} = NextAuth({
   providers: [credentialsProvider],
   session: {
     strategy: 'jwt',
