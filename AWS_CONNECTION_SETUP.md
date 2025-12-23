@@ -103,7 +103,7 @@ If connection fails, check:
 2. **Unique External ID**: Use a different External ID for each organization/account
 3. **Rotate External ID**: Periodically rotate External IDs (requires updating both AWS trust policy and PULSE)
 4. **Monitor Access**: Enable CloudTrail to monitor AssumeRole calls
-5. **Restrict Principal**: If PULSE runs on AWS, use the specific account ID instead of `*`
+5. **Restrict Principal**: Always use PULSE's dedicated AWS account ID: `arn:aws:iam::298199649603:root`. Never use `*`.
 
 ## Troubleshooting
 
@@ -126,9 +126,9 @@ If connection fails, check:
 - Verify there are actual costs in the selected time period
 - Check that the account has active services
 
-## Example Trust Policy (More Secure)
+## Production Trust Policy
 
-If you know PULSE's AWS account ID (e.g., `999999999999`):
+PULSE uses a dedicated AWS integration account. Always use this Trust Policy:
 
 ```json
 {
@@ -137,7 +137,7 @@ If you know PULSE's AWS account ID (e.g., `999999999999`):
     {
       "Effect": "Allow",
       "Principal": {
-        "AWS": "arn:aws:iam::999999999999:root"
+        "AWS": "arn:aws:iam::298199649603:root"
       },
       "Action": "sts:AssumeRole",
       "Condition": {
@@ -150,31 +150,7 @@ If you know PULSE's AWS account ID (e.g., `999999999999`):
 }
 ```
 
-## Example Trust Policy (Less Secure, Any Account)
-
-If PULSE is not hosted on AWS or you want to allow any account:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "AWS": "*"
-      },
-      "Action": "sts:AssumeRole",
-      "Condition": {
-        "StringEquals": {
-          "sts:ExternalId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-        }
-      }
-    }
-  ]
-}
-```
-
-**Warning**: Using `*` allows any AWS account to assume the role if they know the External ID. Only use this if PULSE is not hosted on AWS and you trust the External ID to remain secret.
+**Security**: This Trust Policy restricts access to PULSE's dedicated AWS account only (`298199649603`). Even if the External ID is compromised, only PULSE can assume the role. Never use `*` as Principal.
 
 ## Required IAM Permissions Summary
 

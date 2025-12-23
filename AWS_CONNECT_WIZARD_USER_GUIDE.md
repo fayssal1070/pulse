@@ -55,10 +55,7 @@ This guide provides step-by-step instructions for connecting an AWS account to P
    - Click **"Copy JSON"** button
    - Go back to AWS tab
    - Paste the JSON into the editor
-3. **Important**: The Trust Policy contains a placeholder `YOUR_PULSE_AWS_ACCOUNT_ID`
-   - If you have your PULSE AWS account ID, replace it
-   - If not, contact PULSE support to get it
-   - **DO NOT** use `*` as Principal (not allowed for security)
+3. **Important**: The Trust Policy is pre-configured with PULSE's dedicated AWS account (`arn:aws:iam::298199649603:root`). Do not modify the Principal ARN.
 4. Click **"Next"** button
 
 **📸 Screenshot Placeholder**: AWS IAM Trust Policy editor with pasted JSON
@@ -205,8 +202,8 @@ This guide provides step-by-step instructions for connecting an AWS account to P
 ### Trust Policy Errors
 
 **Error: "Invalid Principal"**
-- Ensure you replaced `YOUR_PULSE_AWS_ACCOUNT_ID` with actual account ID
-- Never use `*` as Principal (security risk)
+- Verify Principal ARN is exactly: `arn:aws:iam::298199649603:root`
+- Never use `*` or any other value (security risk)
 - Contact PULSE support if you don't have the account ID
 
 **Error: "External ID mismatch"**
