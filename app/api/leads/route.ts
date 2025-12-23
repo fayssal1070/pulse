@@ -24,9 +24,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate required fields
-    if (!email || !company) {
+    if (!email) {
       return NextResponse.json(
-        { error: 'Email and company are required' },
+        { error: 'Email is required' },
         { status: 400 }
       )
     }
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       const updated = await prisma.lead.update({
         where: { id: existingLead.id },
         data: {
-          company: company.trim(),
+          company: company?.trim() || existingLead.company,
           role: role?.trim() || null,
           cloudProvider: cloudProvider || null,
           monthlyCloudSpendRange: monthlyCloudSpendRange || null,
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     const lead = await prisma.lead.create({
       data: {
         email: email.toLowerCase().trim(),
-        company: company.trim(),
+        company: company?.trim() || null,
         role: role?.trim() || null,
         cloudProvider: cloudProvider || null,
         monthlyCloudSpendRange: monthlyCloudSpendRange || null,

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 interface Lead {
   id: string
   email: string
-  company: string
+  company: string | null
   role: string | null
   cloudProvider: string | null
   monthlyCloudSpendRange: string | null
@@ -115,7 +115,7 @@ export default function LeadsTable({ leads }: LeadsTableProps) {
                 )}
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm text-gray-900">{lead.company}</div>
+                <div className="text-sm text-gray-900">{lead.company || '-'}</div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-500">{lead.role || '-'}</div>

@@ -9,6 +9,7 @@ import {
 } from '@/lib/demo-dataset'
 import DemoModeBadge from '@/components/demo-mode-badge'
 import DemoActionDisabled from '@/components/demo-action-disabled'
+import DemoEarlyAccessForm from '@/components/demo-early-access-form'
 
 export default function DemoPage() {
   const monthlyTotal = getCurrentMonthTotal()
@@ -23,21 +24,26 @@ export default function DemoPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Demo Mode Banner */}
-      <div className="bg-yellow-50 border-b-4 border-yellow-400 p-4">
+      {/* Demo Mode Banner - DEMO DATA ONLY */}
+      <div className="bg-red-600 text-white border-b-4 border-red-800 p-4 sticky top-0 z-50 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <svg className="w-5 h-5 text-yellow-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-6 h-6 text-white mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
-              <p className="text-sm text-yellow-700">
-                <span className="font-semibold">DEMO MODE:</span> You are viewing demonstration data. This is not real cost information. All actions are disabled.
-              </p>
+              <div>
+                <p className="text-base font-bold uppercase tracking-wide">
+                  ⚠️ DEMO DATA ONLY - NO REAL DATA ACCESSED
+                </p>
+                <p className="text-sm text-red-100 mt-1">
+                  This page displays static demonstration data only. No database connections or real user data are accessed. All actions are disabled.
+                </p>
+              </div>
             </div>
             <Link
               href="/register"
-              className="ml-4 px-4 py-2 text-sm font-medium text-yellow-800 bg-yellow-100 rounded-md hover:bg-yellow-200 transition-colors"
+              className="ml-4 px-4 py-2 text-sm font-medium text-white bg-red-700 rounded-md hover:bg-red-800 transition-colors whitespace-nowrap"
             >
               Sign Up to Get Started
             </Link>
@@ -279,6 +285,11 @@ export default function DemoPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Get Early Access Form */}
+          <div className="mt-8 mb-6">
+            <DemoEarlyAccessForm />
           </div>
 
           {/* CTA Section */}
