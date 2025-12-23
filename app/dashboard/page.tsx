@@ -13,6 +13,7 @@ import DemoBanner from '@/components/demo-banner'
 import LoadDemoButton from '@/components/load-demo-button'
 import SetupProgressWidget from '@/components/setup-progress-widget'
 import SetupCompleteBanner from '@/components/setup-complete-banner'
+import QuickstartWidget from '@/components/quickstart-widget'
 
 export default async function DashboardPage({
   searchParams,
@@ -45,9 +46,19 @@ export default async function DashboardPage({
   // Check if organization has data and if it's demo data
   let hasData = false
   let isDemo = false
+  let hasCostData = false
+  let hasAlerts = false
   if (activeOrgId) {
     hasData = await hasAnyData(activeOrgId)
     isDemo = await hasDemoData(activeOrgId)
+    
+    // Check for quickstart progress
+    const [costRecordsCount, alertRulesCount] = await Promise.all([
+      prisma.costRecord.count({ where: { orgId: activeOrgId } }),
+      prisma.alertRule.count({ where: { orgId: activeOrgId } }),
+    ])
+    hasCostData = costRecordsCount > 0
+    hasAlerts = alertRulesCount > 0
   }
 
   // Get cloud accounts count and status
@@ -151,6 +162,15 @@ export default async function DashboardPage({
               step1Completed={onboardingStatus.step1Completed || false}
               step2Completed={onboardingStatus.step2Completed || false}
               step3Completed={onboardingStatus.step3Completed || false}
+            />
+          )}
+
+          {/* Quickstart Widget */}
+          {activeOrgId && onboardingStatus?.completed && (
+            <QuickstartWidget
+              hasCostData={hasCostData}
+              hasAlerts={hasAlerts}
+              organizationId={activeOrgId}
             />
           )}
 
