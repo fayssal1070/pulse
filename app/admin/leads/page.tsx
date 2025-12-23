@@ -1,6 +1,5 @@
 import { requireAuth } from '@/lib/auth-helpers'
-import { getUserOrganizations } from '@/lib/organizations'
-import { isOrganizationOwner } from '@/lib/organizations'
+import { isAdmin } from '@/lib/admin-helpers'
 import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -12,16 +11,15 @@ export default async function AdminLeadsPage({
 }: {
   searchParams: Promise<{ archived?: string; page?: string }>
 }) {
+  // First, ensure user is authenticated (will redirect to /login if not)
   const user = await requireAuth()
-  const organizations = await getUserOrganizations(user.id)
 
-  // Check if user is owner of at least one organization
-  const isOwner = await Promise.all(
-    organizations.map(org => isOrganizationOwner(org.id, user.id))
-  ).then(results => results.some(r => r))
+  // Then, check if user is admin based on ADMIN_EMAILS allowlist
+  const isAdminUser = await isAdmin()
 
-  if (!isOwner) {
-    redirect('/dashboard')
+  if (!isAdminUser) {
+    // Redirect non-admin users to dashboard with a message
+    redirect('/dashboard?error=admin_required')
   }
 
   const params = await searchParams
