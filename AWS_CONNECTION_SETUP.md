@@ -1,0 +1,194 @@
+# AWS Cost Explorer Connection Setup
+
+## Overview
+PULSE connects to AWS using **AssumeRole** with an **External ID** for secure, credential-free access. This allows AWS to grant PULSE read-only access to Cost Explorer data without storing AWS access keys.
+
+## Prerequisites
+- AWS Account with billing enabled
+- AWS IAM permissions to create roles and policies
+- Cost Explorer API access enabled (usually automatic)
+
+## Step-by-Step Setup
+
+### 1. Create IAM Role in AWS Account
+
+#### 1.1 Create Trust Policy
+Create a new IAM role with the following trust policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::PULSE_ACCOUNT_ID:root"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": {
+          "sts:ExternalId": "YOUR_EXTERNAL_ID"
+        }
+      }
+    }
+  ]
+}
+```
+
+**Replace:**
+- `PULSE_ACCOUNT_ID`: The AWS account ID where PULSE runs (if applicable) OR use `*` for any account (less secure but simpler)
+- `YOUR_EXTERNAL_ID`: A unique, random string (e.g., UUID) that you'll provide to PULSE
+
+**Note**: For maximum security, replace `PULSE_ACCOUNT_ID` with the actual AWS account ID where PULSE is hosted. If PULSE is not hosted on AWS, you can use `*` but this is less secure.
+
+#### 1.2 Create Permissions Policy
+Attach the following policy to the role (or create a custom policy):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ce:GetCostAndUsage",
+        "ce:GetDimensionValues",
+        "ce:GetUsageReport"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**Alternative**: Use AWS managed policy `AWSCostExplorerReadOnlyAccess` (if available) or create a custom policy with the above permissions.
+
+#### 1.3 Get Role ARN
+After creating the role, note the **Role ARN** (e.g., `arn:aws:iam::123456789012:role/PULSE-CostExplorer-Role`).
+
+### 2. Generate External ID
+
+Generate a unique External ID:
+- Use a UUID generator: `uuidgen` (macOS/Linux) or online UUID generator
+- Or use a random string: `openssl rand -hex 16`
+- Example: `a1b2c3d4-e5f6-7890-abcd-ef1234567890`
+
+**Important**: Keep this External ID secret. It will be stored in PULSE's database (encrypted at rest if your database supports it).
+
+### 3. Configure in PULSE
+
+In PULSE, when connecting AWS:
+1. Select **AWS** as provider
+2. Select **Cost Explorer** as connection type
+3. Enter:
+   - **Role ARN**: The ARN from step 1.3
+   - **External ID**: The External ID from step 2
+   - **Account Name**: A friendly name (e.g., "Production AWS Account")
+
+### 4. Test Connection
+
+After configuration, PULSE will:
+1. Attempt to assume the role using the External ID
+2. Fetch cost data for the last 30 days
+3. Display "Last synced" timestamp if successful
+
+If connection fails, check:
+- Role ARN is correct
+- External ID matches the trust policy
+- Permissions policy is attached to the role
+- Cost Explorer API is enabled in your AWS account
+
+## Security Best Practices
+
+1. **Use Least Privilege**: Only grant `ce:GetCostAndUsage` and related read-only permissions
+2. **Unique External ID**: Use a different External ID for each organization/account
+3. **Rotate External ID**: Periodically rotate External IDs (requires updating both AWS trust policy and PULSE)
+4. **Monitor Access**: Enable CloudTrail to monitor AssumeRole calls
+5. **Restrict Principal**: If PULSE runs on AWS, use the specific account ID instead of `*`
+
+## Troubleshooting
+
+### Error: "Access Denied"
+- Verify the Role ARN is correct
+- Check that the External ID matches the trust policy condition
+- Ensure the permissions policy is attached
+
+### Error: "Role not found"
+- Verify the Role ARN format: `arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME`
+- Check that the role exists in the correct AWS account
+
+### Error: "Cost Explorer API not enabled"
+- Cost Explorer is usually enabled automatically
+- Check AWS Billing & Cost Management console
+- Ensure you have billing permissions
+
+### Error: "No cost data returned"
+- Cost data may take 24-48 hours to appear
+- Verify there are actual costs in the selected time period
+- Check that the account has active services
+
+## Example Trust Policy (More Secure)
+
+If you know PULSE's AWS account ID (e.g., `999999999999`):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::999999999999:root"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": {
+          "sts:ExternalId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        }
+      }
+    }
+  ]
+}
+```
+
+## Example Trust Policy (Less Secure, Any Account)
+
+If PULSE is not hosted on AWS or you want to allow any account:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "*"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": {
+          "sts:ExternalId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        }
+      }
+    }
+  ]
+}
+```
+
+**Warning**: Using `*` allows any AWS account to assume the role if they know the External ID. Only use this if PULSE is not hosted on AWS and you trust the External ID to remain secret.
+
+## Required IAM Permissions Summary
+
+**For the IAM Role:**
+- `ce:GetCostAndUsage` - Fetch cost and usage data
+- `ce:GetDimensionValues` - Get available dimensions (optional, for future features)
+- `ce:GetUsageReport` - Get usage reports (optional, for future features)
+
+**For the Trust Policy:**
+- `sts:AssumeRole` - Allow PULSE to assume the role
+- `sts:ExternalId` condition - Require matching External ID
+
+---
+
+**Next Steps**: After setting up the AWS connection, PULSE will automatically sync costs daily at 06:00 Europe/Brussels time. You can also trigger a manual sync from the dashboard (rate-limited to once per 15 minutes).
+

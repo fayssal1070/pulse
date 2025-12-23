@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-aws-costs",
+      "schedule": "0 5 * * *"
+    }
+  ]
+}
+
