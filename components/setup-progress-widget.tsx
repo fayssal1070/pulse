@@ -50,17 +50,28 @@ export default function SetupProgressWidget({
             >
               {step.completed ? '✓' : step.num}
             </div>
-            <span
-              className={`text-sm ${
-                step.completed
-                  ? 'text-gray-900'
-                  : step.num === currentStep
-                  ? 'text-blue-600 font-medium'
-                  : 'text-gray-500'
-              }`}
-            >
-              {step.label}
-            </span>
+            <div className="flex-1 flex items-center justify-between">
+              <span
+                className={`text-sm ${
+                  step.completed
+                    ? 'text-gray-900'
+                    : step.num === currentStep
+                    ? 'text-blue-600 font-medium'
+                    : 'text-gray-500'
+                }`}
+              >
+                {step.label}
+              </span>
+              {step.num === 2 && !step.completed && (
+                <Link
+                  href="/help/import-csv"
+                  className="text-xs text-blue-600 hover:text-blue-700 ml-2"
+                  title="How to export CSV from cloud providers"
+                >
+                  Help →
+                </Link>
+              )}
+            </div>
           </div>
         ))}
       </div>

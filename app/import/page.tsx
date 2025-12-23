@@ -146,7 +146,15 @@ function ImportPageContent() {
                     📊 Download Sample CSV
                   </a>
                 </div>
-                <p className="mt-3 text-xs text-gray-600">
+                <div className="mt-3 pt-3 border-t border-blue-200">
+                  <Link
+                    href="/help/import-csv"
+                    className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    📖 How to export CSV from AWS, GCP, or Azure →
+                  </Link>
+                </div>
+                <p className="mt-2 text-xs text-gray-600">
                   The sample CSV contains 45 realistic records you can import immediately to see your dashboard populated.
                 </p>
               </div>

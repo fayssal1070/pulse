@@ -12,7 +12,7 @@ export default async function middleware(request: NextRequest) {
   const isLoggedIn = !!sessionToken
 
   // Routes publiques
-  const publicRoutes = ['/', '/pricing', '/security', '/contact', '/about', '/login', '/register', '/thank-you', '/thanks', '/onboarding', '/demo']
+  const publicRoutes = ['/', '/pricing', '/security', '/contact', '/about', '/login', '/register', '/thank-you', '/thanks', '/onboarding', '/demo', '/help']
   const isPublicRoute = publicRoutes.includes(pathname) ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/invitations/') ||
