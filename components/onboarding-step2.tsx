@@ -16,10 +16,30 @@ export default function OnboardingStep2({ organizationId, onComplete }: Onboardi
 
   const handleAddAccount = async (e: React.FormEvent) => {
     e.preventDefault()
-    // For MVP, we just mark step 2 as complete (declarative)
-    // In production, this would save the cloud account info
-    router.refresh()
-    onComplete()
+    
+    try {
+      const res = await fetch('/api/cloud-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: cloudProvider,
+          accountName: accountName.trim(),
+          accountIdentifier: null,
+          notes: 'Added during onboarding',
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error || 'Failed to add cloud account')
+        return
+      }
+
+      router.refresh()
+      onComplete()
+    } catch {
+      alert('An error occurred')
+    }
   }
 
   const handleImportCSV = () => {

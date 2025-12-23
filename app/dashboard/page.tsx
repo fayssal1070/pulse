@@ -12,6 +12,7 @@ import OrgSwitcher from '@/components/org-switcher'
 import DemoBanner from '@/components/demo-banner'
 import LoadDemoButton from '@/components/load-demo-button'
 import SetupProgressWidget from '@/components/setup-progress-widget'
+import SetupCompleteBanner from '@/components/setup-complete-banner'
 
 export default async function DashboardPage({
   searchParams,
@@ -24,13 +25,18 @@ export default async function DashboardPage({
   const organizations = await getUserOrganizations(user.id)
   const activeOrg = await getActiveOrganization(user.id)
 
-  // Redirect to onboarding if org is empty and onboarding not completed
+  // Redirect to onboarding if no org or onboarding not completed
+  let onboardingStatus = null
   if (activeOrg) {
-    const onboardingStatus = await getOnboardingStatus(activeOrg.id)
+    onboardingStatus = await getOnboardingStatus(activeOrg.id)
     if (!onboardingStatus.completed) {
       const { redirect } = await import('next/navigation')
       redirect('/onboarding')
     }
+  } else {
+    // No active org - redirect to onboarding to create one
+    const { redirect } = await import('next/navigation')
+    redirect('/onboarding')
   }
 
   // Récupérer les données du dashboard pour l'org active
@@ -39,11 +45,9 @@ export default async function DashboardPage({
   // Check if organization has data and if it's demo data
   let hasData = false
   let isDemo = false
-  let onboardingStatus = null
   if (activeOrgId) {
     hasData = await hasAnyData(activeOrgId)
     isDemo = await hasDemoData(activeOrgId)
-    onboardingStatus = await getOnboardingStatus(activeOrgId)
   }
 
   // Get cloud accounts count and status
@@ -129,6 +133,11 @@ export default async function DashboardPage({
                 : 'Cost overview across all your organizations'}
             </p>
           </div>
+
+          {/* Setup Complete Banner */}
+          {activeOrgId && onboardingStatus?.completed && (
+            <SetupCompleteBanner />
+          )}
 
           {/* Demo Banner */}
           {activeOrgId && isDemo && (

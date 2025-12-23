@@ -5,6 +5,15 @@ export async function getOnboardingStatus(orgId: string) {
     where: { id: orgId },
     select: {
       onboardingCompletedAt: true,
+      budgetMonthlyEUR: true,
+      cloudAccounts: {
+        take: 1,
+        select: { id: true },
+      },
+      alertRules: {
+        take: 1,
+        select: { id: true },
+      },
       costRecords: {
         take: 1,
         select: { id: true },
@@ -13,19 +22,20 @@ export async function getOnboardingStatus(orgId: string) {
   })
 
   if (!org) {
-    return { completed: false, step: 1 }
+    return { completed: false, currentStep: 1, step1Completed: false, step2Completed: false, step3Completed: false }
   }
 
   // Step 1: Organization exists (always true if we have orgId)
   const step1Completed = true
 
-  // Step 2: Has cloud account or CSV imported (has cost records)
-  const step2Completed = org.costRecords.length > 0
+  // Step 2: Has cloud account (created manually) OR has cost records (CSV imported)
+  const step2Completed = org.cloudAccounts.length > 0 || org.costRecords.length > 0
 
-  // Step 3: Has visited dashboard (onboardingCompletedAt set)
-  const step3Completed = org.onboardingCompletedAt !== null
+  // Step 3: Has budget OR alert rule (at least one configured)
+  const step3Completed = org.budgetMonthlyEUR !== null || org.alertRules.length > 0
 
-  const completed = step1Completed && step2Completed && step3Completed
+  // Onboarding is complete if all steps are done OR onboardingCompletedAt is set
+  const completed = (step1Completed && step2Completed && step3Completed) || org.onboardingCompletedAt !== null
 
   let currentStep = 1
   if (step1Completed && !step2Completed) {
