@@ -25,10 +25,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Calculate minimum time since last sync (skip accounts synced within last N minutes)
+    // Calculate minimum time since last sync (skip accounts synced within last 6 hours)
+    // Cost Explorer updates every 24 hours, so syncing more frequently is unnecessary
     const minTimeSinceLastSync = new Date()
-    minTimeSinceLastSync.setMinutes(
-      minTimeSinceLastSync.getMinutes() - SYNC_CONFIG.SYNC_INTERVAL_MINUTES
+    minTimeSinceLastSync.setHours(
+      minTimeSinceLastSync.getHours() - SYNC_CONFIG.MIN_SYNC_INTERVAL_HOURS
     )
 
     // Find all active AWS Cost Explorer accounts that need syncing

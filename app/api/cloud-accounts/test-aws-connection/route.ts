@@ -64,12 +64,23 @@ export async function POST(request: NextRequest) {
       
       // Provide user-friendly error messages
       let userMessage = 'Connection test failed'
-      if (errorMessage.includes('AccessDenied') || errorMessage.includes('UnauthorizedOperation')) {
+      if (
+        errorMessage.includes('AccessDenied') ||
+        errorMessage.includes('UnauthorizedOperation') ||
+        errorMessage.includes('Access denied')
+      ) {
         userMessage = 'Access denied. Please verify the Role ARN, External ID, and IAM permissions.'
       } else if (errorMessage.includes('InvalidUserID.NotFound')) {
         userMessage = 'Role not found. Please verify the Role ARN is correct.'
       } else if (errorMessage.includes('ExternalId')) {
         userMessage = 'External ID mismatch. Please ensure the External ID in the Trust Policy matches the one shown above.'
+      } else if (
+        errorMessage.includes('not enabled for cost explorer') ||
+        errorMessage.includes('Cost Explorer') ||
+        errorMessage.includes('cost explorer access')
+      ) {
+        userMessage =
+          'Cost Explorer is not enabled for your AWS account. Please: 1) Go to AWS Billing & Cost Management Console, 2) Click "Launch Cost Explorer" (first time only), 3) Wait ~24 hours for data to become available, then try again.'
       }
 
       return NextResponse.json(

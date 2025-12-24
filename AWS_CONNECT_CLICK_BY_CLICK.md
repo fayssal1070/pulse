@@ -1,7 +1,11 @@
 # AWS Connect Wizard - Click-by-Click Guide
 
 ## Overview
-This guide provides exact click-by-click instructions for connecting AWS to PULSE. Total time: ~5 minutes.
+This guide provides exact click-by-click instructions for connecting AWS to PULSE. Two methods available:
+1. **CloudFormation (Recommended)**: 1-click deploy - ~2 minutes
+2. **Manual Setup**: Step-by-step IAM configuration - ~5 minutes
+
+**Important**: AWS Cost Explorer updates data every 24 hours. PULSE syncs once daily by default. Manual syncs are rate-limited to once every 6 hours.
 
 ---
 
@@ -45,9 +49,11 @@ This guide provides exact click-by-click instructions for connecting AWS to PULS
 
 ---
 
-## Part 2: In AWS Console (3 minutes)
+## Part 2: In AWS Console
 
-### Step 5: Open AWS IAM Console
+**Note**: If using CloudFormation (recommended), follow Step 4A. If using manual setup, follow Step 4B.
+
+### Step 5: (Manual Setup Only) Open AWS IAM Console
 1. **Open a new browser tab**
 2. **Navigate to**: https://console.aws.amazon.com/iam
 3. **Sign in** with your AWS account credentials

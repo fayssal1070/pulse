@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import { generateCloudFormationTemplate } from '@/lib/aws-cloudformation'
 
 export default function ConnectAWSPage() {
   const router = useRouter()
@@ -250,11 +251,86 @@ export default function ConnectAWSPage() {
 
         {/* Step 2: Create IAM Role in AWS */}
         <div className="bg-white shadow rounded-lg p-6 mb-6">
-          <div className="flex items-center mb-4">
-            <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold mr-3">
-              2
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold mr-3">
+                2
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900">Create IAM Role in AWS</h2>
             </div>
-            <h2 className="text-xl font-semibold text-gray-900">Create IAM Role in AWS</h2>
+            <button
+              onClick={() => {
+                const template = generateCloudFormationTemplate(externalId, pulsePrincipalArn)
+                const blob = new Blob([template], { type: 'application/json' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = 'pulse-cost-explorer-role.json'
+                a.click()
+                URL.revokeObjectURL(url)
+              }}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium"
+            >
+              📥 Download CloudFormation Template
+            </button>
+          </div>
+
+          {/* CloudFormation Option */}
+          <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6 mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              🚀 Quick Deploy (Recommended): Use CloudFormation
+            </h3>
+            <p className="text-gray-700 mb-4">
+              Deploy the IAM Role automatically with one click using AWS CloudFormation. This is the
+              fastest and most reliable method.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Step 1: Download Template</h4>
+                <p className="text-sm text-gray-600 mb-2">
+                  Click the button above to download the CloudFormation template (already configured
+                  with your External ID).
+                </p>
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Step 2: Deploy in AWS</h4>
+                <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
+                  <li>
+                    Go to{' '}
+                    <a
+                      href="https://console.aws.amazon.com/cloudformation"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-700 underline"
+                    >
+                      AWS CloudFormation Console
+                    </a>
+                  </li>
+                  <li>Click "Create stack" → "With new resources (standard)"</li>
+                  <li>Select "Upload a template file"</li>
+                  <li>Upload the downloaded JSON file</li>
+                  <li>Click "Next"</li>
+                  <li>Enter a stack name (e.g., "PULSE-CostExplorer-Setup")</li>
+                  <li>Click "Next" → "Next" → "Create stack"</li>
+                  <li>
+                    <strong>Wait for stack creation to complete</strong> (usually 10-30 seconds)
+                  </li>
+                  <li>
+                    In the "Outputs" tab, <strong>copy the RoleArn</strong> value
+                  </li>
+                </ol>
+                <p className="text-sm text-gray-500 italic mt-2">
+                  📸 Screenshot Placeholder: CloudFormation stack created with RoleArn in Outputs
+                  tab
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-200 pt-6 mt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Alternative: Manual Setup (Advanced)
+            </h3>
           </div>
 
           <div className="space-y-6">

@@ -14,22 +14,59 @@ export interface SyncPipelineResult {
 
 /**
  * Sync costs for a single AWS CloudAccount
+ * Includes lock to prevent parallel syncs for the same account
  */
 export async function syncCloudAccountCosts(
-  cloudAccountId: string
+  cloudAccountId: string,
+  skipTimeCheck: boolean = false // Admin override to skip 6h check
 ): Promise<SyncPipelineResult> {
-  const cloudAccount = await prisma.cloudAccount.findUnique({
-    where: { id: cloudAccountId },
-    select: {
-      id: true,
-      orgId: true,
-      provider: true,
-      connectionType: true,
-      roleArn: true,
-      externalId: true,
-      status: true,
+  // Acquire account-specific lock
+  const accountLockId = `aws-sync-${cloudAccountId}`
+  const now = new Date()
+  const lockExpiry = new Date(now.getTime() + 10 * 60 * 1000) // 10 minutes lock
+
+  // Check if account is already being synced
+  const existingLock = await prisma.jobLock.findUnique({
+    where: { id: accountLockId },
+  })
+
+  if (existingLock && existingLock.lockedUntil > now) {
+    return {
+      cloudAccountId,
+      orgId: '',
+      success: false,
+      recordsCount: 0,
+      totalAmount: 0,
+      error: 'Sync already in progress for this account. Please wait.',
+    }
+  }
+
+  // Acquire lock
+  await prisma.jobLock.upsert({
+    where: { id: accountLockId },
+    create: {
+      id: accountLockId,
+      lockedUntil: lockExpiry,
+    },
+    update: {
+      lockedUntil: lockExpiry,
     },
   })
+
+  try {
+    const cloudAccount = await prisma.cloudAccount.findUnique({
+      where: { id: cloudAccountId },
+      select: {
+        id: true,
+        orgId: true,
+        provider: true,
+        connectionType: true,
+        roleArn: true,
+        externalId: true,
+        status: true,
+        lastSyncedAt: true,
+      },
+    })
 
   if (!cloudAccount) {
     return {
@@ -55,6 +92,10 @@ export async function syncCloudAccountCosts(
   }
 
   if (!cloudAccount.roleArn || !cloudAccount.externalId) {
+    await prisma.jobLock.update({
+      where: { id: accountLockId },
+      data: { lockedUntil: new Date() },
+    })
     return {
       cloudAccountId,
       orgId: cloudAccount.orgId,
@@ -62,6 +103,26 @@ export async function syncCloudAccountCosts(
       recordsCount: 0,
       totalAmount: 0,
       error: 'Missing roleArn or externalId',
+    }
+  }
+
+  // Check if synced recently (unless admin override)
+  if (!skipTimeCheck && cloudAccount.lastSyncedAt) {
+    const sixHoursAgo = new Date(now.getTime() - 6 * 60 * 60 * 1000)
+    if (cloudAccount.lastSyncedAt > sixHoursAgo) {
+      await prisma.jobLock.update({
+        where: { id: accountLockId },
+        data: { lockedUntil: new Date() },
+      })
+      const minutesSince = Math.floor((now.getTime() - cloudAccount.lastSyncedAt.getTime()) / 60000)
+      return {
+        cloudAccountId,
+        orgId: cloudAccount.orgId,
+        success: false,
+        recordsCount: 0,
+        totalAmount: 0,
+        error: `Synced ${minutesSince} minutes ago. Cost Explorer updates every 24 hours. Please wait at least 6 hours between syncs.`,
+      }
     }
   }
 
@@ -163,23 +224,46 @@ export async function syncCloudAccountCosts(
     upsertedCount++
   }
 
-  // Update cloud account status
-  await prisma.cloudAccount.update({
-    where: { id: cloudAccountId },
-    data: {
-      status: 'active',
-      lastSyncedAt: new Date(),
-      lastSyncError: null,
-    },
-  })
+    // Update cloud account status
+    await prisma.cloudAccount.update({
+      where: { id: cloudAccountId },
+      data: {
+        status: 'active',
+        lastSyncedAt: new Date(),
+        lastSyncError: null,
+      },
+    })
 
-  return {
-    cloudAccountId,
-    orgId: cloudAccount.orgId,
-    success: true,
-    recordsCount: upsertedCount,
-    totalAmount: syncResult.totalAmount,
-    services: syncResult.services,
+    // Release lock
+    await prisma.jobLock.update({
+      where: { id: accountLockId },
+      data: { lockedUntil: new Date() },
+    })
+
+    return {
+      cloudAccountId,
+      orgId: cloudAccount.orgId,
+      success: true,
+      recordsCount: upsertedCount,
+      totalAmount: syncResult.totalAmount,
+      services: syncResult.services,
+    }
+  } catch (error) {
+    // Release lock on error
+    await prisma.jobLock.update({
+      where: { id: accountLockId },
+      data: { lockedUntil: new Date() },
+    }).catch(() => {}) // Ignore errors when releasing
+
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return {
+      cloudAccountId,
+      orgId: '',
+      success: false,
+      recordsCount: 0,
+      totalAmount: 0,
+      error: errorMessage,
+    }
   }
 }
 

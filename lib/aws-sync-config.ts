@@ -1,11 +1,11 @@
 // AWS Sync Configuration with environment variable defaults
 
 export const SYNC_CONFIG = {
-  // Sync interval in minutes (how often cron runs)
-  SYNC_INTERVAL_MINUTES: parseInt(process.env.SYNC_INTERVAL_MINUTES || '5', 10),
+  // Minimum hours between syncs (Cost Explorer updates every 24h)
+  MIN_SYNC_INTERVAL_HOURS: parseInt(process.env.MIN_SYNC_INTERVAL_HOURS || '6', 10),
   
   // Lock TTL in seconds (how long lock is held)
-  SYNC_LOCK_TTL_SECONDS: parseInt(process.env.SYNC_LOCK_TTL_SECONDS || '240', 10),
+  SYNC_LOCK_TTL_SECONDS: parseInt(process.env.SYNC_LOCK_TTL_SECONDS || '600', 10), // 10 minutes
   
   // Maximum accounts to sync per run
   MAX_ACCOUNTS_PER_RUN: parseInt(process.env.MAX_ACCOUNTS_PER_RUN || '10', 10),

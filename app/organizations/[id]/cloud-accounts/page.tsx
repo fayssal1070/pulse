@@ -128,7 +128,10 @@ export default async function CloudAccountsPage({
                         {account.connectionType === 'COST_EXPLORER' && (
                           <p>
                             <span className="font-medium">Auto-sync:</span>{' '}
-                            <span className="text-green-600">every 5 minutes</span>
+                            <span className="text-green-600">once daily</span>
+                            <span className="text-xs text-gray-500 ml-2">
+                              (Cost Explorer updates every 24h)
+                            </span>
                           </p>
                         )}
                         {account.accountIdentifier && (
