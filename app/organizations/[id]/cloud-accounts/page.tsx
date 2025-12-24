@@ -125,6 +125,12 @@ export default async function CloudAccountsPage({
                         <p>
                           <span className="font-medium">Provider:</span> {account.provider}
                         </p>
+                        {account.connectionType === 'COST_EXPLORER' && (
+                          <p>
+                            <span className="font-medium">Auto-sync:</span>{' '}
+                            <span className="text-green-600">every 5 minutes</span>
+                          </p>
+                        )}
                         {account.accountIdentifier && (
                           <p>
                             <span className="font-medium">Account ID:</span>{' '}
@@ -136,18 +142,36 @@ export default async function CloudAccountsPage({
                             <span className="font-medium">Role ARN:</span> {account.roleArn}
                           </p>
                         )}
-                        {account.lastSyncedAt && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
                           <p>
-                            <span className="font-medium">Last synced:</span>{' '}
-                            {formatDate(account.lastSyncedAt)}
+                            <span className="font-medium">Status:</span>{' '}
+                            <span
+                              className={
+                                account.status === 'active'
+                                  ? 'text-green-600'
+                                  : account.status === 'error'
+                                  ? 'text-red-600'
+                                  : 'text-yellow-600'
+                              }
+                            >
+                              {account.status.toUpperCase()}
+                            </span>
                           </p>
-                        )}
-                        {account.lastSyncError && (
-                          <p className="text-red-600">
-                            <span className="font-medium">Last error:</span>{' '}
-                            {account.lastSyncError}
-                          </p>
-                        )}
+                          {account.lastSyncedAt ? (
+                            <p>
+                              <span className="font-medium">Last synced:</span>{' '}
+                              {formatDate(account.lastSyncedAt)}
+                            </p>
+                          ) : (
+                            <p className="text-gray-500">Never synced</p>
+                          )}
+                          {account.lastSyncError && (
+                            <p className="text-red-600 mt-1">
+                              <span className="font-medium">Last error:</span>{' '}
+                              <span className="text-xs">{account.lastSyncError}</span>
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="ml-4 flex flex-col space-y-2">

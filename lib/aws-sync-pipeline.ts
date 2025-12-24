@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { syncAWSCosts, AWSSyncResult } from './aws-cost-explorer'
+import { SYNC_CONFIG } from './aws-sync-config'
 
 export interface SyncPipelineResult {
   cloudAccountId: string
@@ -92,13 +93,13 @@ export async function syncCloudAccountCosts(
     }
   }
 
-  // Upsert cost records
-  // First, fetch the cost data again to get individual records
-  const { fetchDailyCosts } = await import('./aws-cost-explorer')
-  const endDate = new Date()
-  endDate.setHours(0, 0, 0, 0)
-  const startDate = new Date(endDate)
-  startDate.setDate(startDate.getDate() - 30)
+    // Upsert cost records
+    // First, fetch the cost data again to get individual records
+    const { fetchDailyCosts } = await import('./aws-cost-explorer')
+    const endDate = new Date()
+    endDate.setHours(0, 0, 0, 0)
+    const startDate = new Date(endDate)
+    startDate.setDate(startDate.getDate() - SYNC_CONFIG.AWS_SYNC_LOOKBACK_DAYS)
 
   const costData = await fetchDailyCosts(
     cloudAccount.roleArn,

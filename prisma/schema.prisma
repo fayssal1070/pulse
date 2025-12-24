@@ -121,3 +121,10 @@ model CloudAccount {
   @@index([status])
   @@index([provider, connectionType])
 }
+
+model JobLock {
+  id          String   @id @default("aws-cost-sync")
+  lockedUntil DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
