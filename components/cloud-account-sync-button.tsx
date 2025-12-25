@@ -27,11 +27,8 @@ export default function CloudAccountSyncButton({ cloudAccountId }: CloudAccountS
       const data = await res.json()
 
       if (!res.ok) {
-        if (res.status === 429) {
-          setError(data.error || 'Rate limit exceeded. Please wait before syncing again.')
-        } else {
-          setError(data.error || 'Sync failed')
-        }
+        // Show error message (but not blocking messages about waiting)
+        setError(data.error || 'Sync failed')
         return
       }
 
