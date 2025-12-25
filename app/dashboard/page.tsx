@@ -106,12 +106,13 @@ export default async function DashboardPage({
   }
 
   // Check for banner states: Data Pending vs No Costs
+  // Use lastAwsFetch metadata to make precise decisions
   let showDataPendingBanner = false
   let showNoCostsBanner = false
   let bannerMessage = ''
 
   if (hasActiveAWS && activeOrgId) {
-    // Get the AWS account with lastSyncError to check error codes
+    // Get the AWS account with lastSyncError and notes (for lastAwsFetch metadata)
     const awsAccount = await prisma.cloudAccount.findFirst({
       where: {
         orgId: activeOrgId,
@@ -122,6 +123,8 @@ export default async function DashboardPage({
       select: {
         lastSyncedAt: true,
         lastSyncError: true,
+        notes: true,
+        createdAt: true, // For checking if activation is recent
       },
       orderBy: {
         lastSyncedAt: 'desc',
@@ -129,13 +132,61 @@ export default async function DashboardPage({
     })
 
     if (awsAccount?.lastSyncedAt) {
+      // Parse lastAwsFetch metadata from notes
+      let lastAwsFetch: {
+        recordCount: number
+        totalFromAws: number
+        fetchedAt: string
+      } | null = null
+
+      if (awsAccount.notes) {
+        try {
+          const notes = JSON.parse(awsAccount.notes)
+          if (notes.lastAwsFetch) {
+            lastAwsFetch = notes.lastAwsFetch
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+
       const lastSyncError = awsAccount.lastSyncError || ''
-      
-      // Check for specific error codes
-      if (lastSyncError.includes('[AWS_COST_EXPLORER_NOT_READY]') ||
-          lastSyncError.includes('[AWS_COST_EXPLORER_NOT_ENABLED]')) {
+      const now = new Date()
+      const accountAge = awsAccount.createdAt ? now.getTime() - awsAccount.createdAt.getTime() : Infinity
+      const accountAgeHours = accountAge / (1000 * 60 * 60) // Convert to hours
+      const isRecentActivation = accountAgeHours < 24
+
+      // Decision logic:
+      // 1. If AWS returned costs > 0, no banner (normal case)
+      if (lastAwsFetch && lastAwsFetch.totalFromAws > 0) {
+        // AWS has costs, no banner needed
+        showDataPendingBanner = false
+        showNoCostsBanner = false
+      }
+      // 2. If AWS returned 0 and no records, show "No costs yet"
+      else if (lastAwsFetch && lastAwsFetch.totalFromAws === 0 && lastAwsFetch.recordCount === 0) {
+        showNoCostsBanner = true
+        bannerMessage = 'Aucune dépense détectée sur la période.'
+      }
+      // 3. If lastSyncedAt exists + recordCount > 0 + totalFromAws = 0 + recent activation (<24h)
+      else if (
+        awsAccount.lastSyncedAt &&
+        lastAwsFetch &&
+        lastAwsFetch.recordCount > 0 &&
+        lastAwsFetch.totalFromAws === 0 &&
+        isRecentActivation
+      ) {
         showDataPendingBanner = true
-        bannerMessage = 'AWS Cost Explorer peut prendre jusqu\'à 24h pour préparer les données lors de la première activation.'
+        bannerMessage = 'AWS Cost Explorer prépare les données (première activation). Cela peut prendre jusqu\'à 24h.'
+      }
+      // 4. Legacy: Check for specific error codes (fallback if metadata not available)
+      else if (lastSyncError.includes('[AWS_COST_EXPLORER_NOT_READY]') ||
+               lastSyncError.includes('[AWS_COST_EXPLORER_NOT_ENABLED]')) {
+        // Only show if activation is recent (<24h)
+        if (isRecentActivation) {
+          showDataPendingBanner = true
+          bannerMessage = 'AWS Cost Explorer prépare les données (première activation). Cela peut prendre jusqu\'à 24h.'
+        }
       } else if (lastSyncError.includes('[AWS_NO_COSTS]')) {
         showNoCostsBanner = true
         bannerMessage = 'Aucune dépense détectée sur la période.'
