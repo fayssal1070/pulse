@@ -16,6 +16,8 @@ import SetupCompleteBanner from '@/components/setup-complete-banner'
 import QuickstartWidget from '@/components/quickstart-widget'
 import DebugCostsButton from '@/components/debug-costs-button'
 import AdminDeploymentInfo from '@/components/admin-deployment-info'
+import LastSyncedDate from '@/components/last-synced-date'
+import FormattedDate from '@/components/formatted-date'
 import { isAdmin } from '@/lib/admin-helpers'
 
 export default async function DashboardPage({
@@ -296,15 +298,7 @@ export default async function DashboardPage({
                 <div className="mt-3 pt-3 border-t border-gray-200 space-y-1">
                   <p className="text-xs text-gray-500">0.00 EUR sur 30 jours</p>
                   {awsAccountInfo.lastSyncedAt && (
-                    <p className="text-xs text-gray-500">
-                      Dernière sync: {new Date(awsAccountInfo.lastSyncedAt).toLocaleString('fr-FR', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
+                    <LastSyncedDate date={awsAccountInfo.lastSyncedAt} />
                   )}
                   {activeOrgId && (() => {
                     // Find the AWS account ID to link to records
@@ -460,11 +454,15 @@ export default async function DashboardPage({
                     {dailySeries.map((item, idx) => (
                       <tr key={idx} className="hover:bg-gray-50">
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                          {item.date.toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          })}
+                          <FormattedDate 
+                            date={item.date}
+                            locale="en-US"
+                            options={{
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            }}
+                          />
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
                           {item.total.toFixed(2)}

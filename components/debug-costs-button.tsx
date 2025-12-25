@@ -13,6 +13,8 @@ export default function DebugCostsButton({ isAdmin }: DebugCostsButtonProps) {
   const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
 
+  // Don't render anything if not admin - this is safe because isAdmin is passed from server
+  // and won't change between SSR and CSR
   if (!isAdmin) {
     return null
   }

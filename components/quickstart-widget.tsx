@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 
 interface QuickstartWidgetProps {
   hasCostData: boolean
@@ -130,6 +131,16 @@ export default function QuickstartWidget({
         },
       ]
 
+  // Format date on client side to avoid hydration mismatch
+  const [lastSyncedFormatted, setLastSyncedFormatted] = useState<string | null>(null)
+  
+  useEffect(() => {
+    if (awsAccountInfo?.lastSyncedAt) {
+      // Format only on client side after hydration
+      setLastSyncedFormatted(new Date(awsAccountInfo.lastSyncedAt).toLocaleString())
+    }
+  }, [awsAccountInfo?.lastSyncedAt])
+
   // Add sync info if AWS is connected
   const syncInfo = hasActiveAWS ? (
     <div className="mt-3 pt-3 border-t border-blue-200">
@@ -143,9 +154,9 @@ export default function QuickstartWidget({
         <p className="text-gray-500 italic">
           Note: AWS updates ~24h
         </p>
-        {awsAccountInfo?.lastSyncedAt && (
+        {lastSyncedFormatted && (
           <p className="text-gray-500 mt-1">
-            Last synced: {new Date(awsAccountInfo.lastSyncedAt).toLocaleString()}
+            Last synced: {lastSyncedFormatted}
           </p>
         )}
       </div>
