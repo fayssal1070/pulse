@@ -14,6 +14,8 @@ import LoadDemoButton from '@/components/load-demo-button'
 import SetupProgressWidget from '@/components/setup-progress-widget'
 import SetupCompleteBanner from '@/components/setup-complete-banner'
 import QuickstartWidget from '@/components/quickstart-widget'
+import DebugCostsButton from '@/components/debug-costs-button'
+import { isAdmin } from '@/lib/admin-helpers'
 
 export default async function DashboardPage({
   searchParams,
@@ -25,6 +27,7 @@ export default async function DashboardPage({
   const showAdminError = params?.error === 'admin_required'
   const organizations = await getUserOrganizations(user.id)
   const activeOrg = await getActiveOrganization(user.id)
+  const isAdminUser = await isAdmin()
 
   // Redirect to onboarding if no org or onboarding not completed
   let onboardingStatus = null
@@ -195,13 +198,16 @@ export default async function DashboardPage({
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              {activeOrg
-                ? `Cost overview for ${activeOrg.name}`
-                : 'Cost overview across all your organizations'}
-            </p>
+          <div className="mb-6 flex justify-between items-start">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {activeOrg
+                  ? `Cost overview for ${activeOrg.name}`
+                  : 'Cost overview across all your organizations'}
+              </p>
+            </div>
+            <DebugCostsButton isAdmin={isAdminUser} />
           </div>
 
           {/* Setup Complete Banner */}
