@@ -1,29 +1,27 @@
 'use client'
 
 import { useState } from 'react'
-import { Bug } from 'lucide-react'
-import BuildInfoButton from './build-info-button'
+import { Info } from 'lucide-react'
 
 /**
- * DebugCostsButton - Admin-only debug button for cost data
+ * BuildInfoButton - Admin-only button to check build information
  * 
  * IMPORTANT: This component is only rendered server-side if user is admin.
  * No gating logic here - if this component is mounted, user is admin.
- * This ensures SSR/CSR markup match (no hydration mismatch).
  */
-export default function DebugCostsButton() {
+export default function BuildInfoButton() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
 
-  const handleDebug = async () => {
+  const handleBuildInfo = async () => {
     setLoading(true)
     setError(null)
     setData(null)
 
     try {
-      const res = await fetch('/api/debug/costs', {
+      const res = await fetch('/api/debug/build', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -40,7 +38,7 @@ export default function DebugCostsButton() {
       setData(json)
       setShowModal(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch debug data')
+      setError(err instanceof Error ? err.message : 'Failed to fetch build info')
       setShowModal(true)
     } finally {
       setLoading(false)
@@ -49,18 +47,15 @@ export default function DebugCostsButton() {
 
   return (
     <>
-      <div className="flex items-center space-x-2">
-        <button
-          onClick={handleDebug}
-          disabled={loading}
-          className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Debug costs data (Admin only)"
-        >
-          <Bug className="h-4 w-4 mr-1.5" />
-          {loading ? 'Loading...' : 'Debug costs'}
-        </button>
-        <BuildInfoButton />
-      </div>
+      <button
+        onClick={handleBuildInfo}
+        disabled={loading}
+        className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        title="Build info (Admin only)"
+      >
+        <Info className="h-4 w-4 mr-1.5" />
+        {loading ? 'Loading...' : 'Build info'}
+      </button>
 
       {showModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto" onClick={() => setShowModal(false)}>
@@ -73,7 +68,7 @@ export default function DebugCostsButton() {
             >
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">Debug Costs Data</h3>
+                  <h3 className="text-lg font-medium text-gray-900">Build Information</h3>
                   <button
                     onClick={() => setShowModal(false)}
                     className="text-gray-400 hover:text-gray-500"
@@ -94,24 +89,55 @@ export default function DebugCostsButton() {
 
                 {data && (
                   <div className="space-y-4">
-                    {/* Key metrics highlighted */}
+                    {/* Key info highlighted */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <p className="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">
-                          Sum (30 days)
+                          Commit
                         </p>
-                        <p className="text-2xl font-bold text-blue-900">
-                          {data.sum_30d?.toFixed(2) || '0.00'} EUR
+                        <p className="text-2xl font-bold text-blue-900 font-mono">
+                          {data.commitShaShort}
                         </p>
-                      </div>
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <p className="text-xs font-medium text-green-600 uppercase tracking-wide mb-1">
-                          Count (30 days)
-                        </p>
-                        <p className="text-2xl font-bold text-green-900">
-                          {data.count_30d || 0}
+                        <p className="text-xs text-blue-700 mt-1 font-mono">
+                          {data.commitSha}
                         </p>
                       </div>
+                      <div className={`border rounded-lg p-4 ${
+                        data.env === 'production'
+                          ? 'bg-green-50 border-green-200'
+                          : data.env === 'preview'
+                          ? 'bg-yellow-50 border-yellow-200'
+                          : 'bg-gray-50 border-gray-200'
+                      }`}>
+                        <p className={`text-xs font-medium uppercase tracking-wide mb-1 ${
+                          data.env === 'production'
+                            ? 'text-green-600'
+                            : data.env === 'preview'
+                            ? 'text-yellow-600'
+                            : 'text-gray-600'
+                        }`}>
+                          Environment
+                        </p>
+                        <p className={`text-2xl font-bold ${
+                          data.env === 'production'
+                            ? 'text-green-900'
+                            : data.env === 'preview'
+                            ? 'text-yellow-900'
+                            : 'text-gray-900'
+                        }`}>
+                          {data.env}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Build timestamp */}
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <p className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">
+                        Build Timestamp
+                      </p>
+                      <p className="text-sm text-gray-900">
+                        {new Date(data.buildTimestamp).toLocaleString()}
+                      </p>
                     </div>
 
                     {/* Full JSON */}
@@ -125,7 +151,7 @@ export default function DebugCostsButton() {
                 )}
 
                 {!data && !error && (
-                  <p className="text-sm text-gray-500">Click "Debug costs" to fetch data.</p>
+                  <p className="text-sm text-gray-500">Click "Build info" to fetch data.</p>
                 )}
               </div>
 
