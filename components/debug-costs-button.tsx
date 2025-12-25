@@ -29,29 +29,87 @@ export default function DebugCostsButton() {
     setLoading(true)
     setError(null)
     setData(null)
+    setShowModal(true) // Open modal immediately to show loading state
 
     try {
-      const res = await fetch('/api/debug/costs', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      })
+      // Create abort controller for timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10s timeout
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error(errorData.error || `HTTP ${res.status}`)
+      try {
+        const res = await fetch('/api/debug/costs', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          signal: controller.signal,
+        })
+
+        clearTimeout(timeoutId)
+
+        if (!res.ok) {
+          let errorMessage = `HTTP ${res.status}`
+          let errorDetails = null
+          
+          try {
+            const errorData = await res.json()
+            errorMessage = errorData.error || errorMessage
+            errorDetails = errorData
+          } catch (e) {
+            // If JSON parsing fails, use status text
+            errorMessage = res.statusText || errorMessage
+          }
+
+          setError(`${errorMessage} (Status: ${res.status})`)
+          setData(errorDetails) // Store error details for debugging
+          return
+        }
+
+        const json = await res.json()
+        setData(json)
+        setError(null)
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+        
+        if (fetchError.name === 'AbortError') {
+          setError('Request timeout (10s). The server may be slow or unavailable.')
+        } else {
+          setError(fetchError instanceof Error ? fetchError.message : 'Failed to fetch debug data')
+        }
       }
-
-      const json = await res.json()
-      setData(json)
-      setShowModal(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch debug data')
-      setShowModal(true)
+      // Catch any unexpected errors
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleRetry = () => {
+    handleDebug()
+  }
+
+  const handleCopyJSON = () => {
+    if (data) {
+      const jsonString = JSON.stringify(data, null, 2)
+      navigator.clipboard.writeText(jsonString).then(() => {
+        // Show temporary success feedback
+        const button = document.activeElement as HTMLElement
+        const originalText = button.textContent
+        button.textContent = 'Copied!'
+        setTimeout(() => {
+          button.textContent = originalText
+        }, 2000)
+      }).catch(() => {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea')
+        textarea.value = jsonString
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      })
     }
   }
 
@@ -98,6 +156,12 @@ export default function DebugCostsButton() {
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                     <p className="text-sm text-red-800 font-medium">Error</p>
                     <p className="text-sm text-red-600 mt-1">{error}</p>
+                    <button
+                      onClick={handleRetry}
+                      className="mt-2 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      Retry
+                    </button>
                   </div>
                 )}
 
@@ -125,7 +189,15 @@ export default function DebugCostsButton() {
 
                     {/* Full JSON */}
                     <div>
-                      <p className="text-sm font-medium text-gray-700 mb-2">Full Response:</p>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium text-gray-700">Full Response:</p>
+                        <button
+                          onClick={handleCopyJSON}
+                          className="px-3 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                        >
+                          Copy JSON
+                        </button>
+                      </div>
                       <pre className="bg-gray-50 border border-gray-200 rounded-md p-4 text-xs overflow-x-auto max-h-96">
                         {JSON.stringify(data, null, 2)}
                       </pre>
@@ -133,19 +205,35 @@ export default function DebugCostsButton() {
                   </div>
                 )}
 
-                {!data && !error && (
+                {loading && (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span className="ml-3 text-gray-600">Loading...</span>
+                  </div>
+                )}
+
+                {!loading && !data && !error && (
                   <p className="text-sm text-gray-500">Click "Debug costs" to fetch data.</p>
                 )}
               </div>
 
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse sm:space-x-reverse sm:space-x-3">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm"
                 >
                   Close
                 </button>
+                {error && (
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm"
+                  >
+                    Retry
+                  </button>
+                )}
               </div>
             </div>
           </div>
