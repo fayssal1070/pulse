@@ -1,28 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Bug } from 'lucide-react'
 
-interface DebugCostsButtonProps {
-  isAdmin: boolean
-}
-
-export default function DebugCostsButton({ isAdmin }: DebugCostsButtonProps) {
-  const [mounted, setMounted] = useState(false)
+/**
+ * DebugCostsButton - Admin-only debug button for cost data
+ * 
+ * IMPORTANT: This component is only rendered server-side if user is admin.
+ * No gating logic here - if this component is mounted, user is admin.
+ * This ensures SSR/CSR markup match (no hydration mismatch).
+ */
+export default function DebugCostsButton() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
-
-  // Only render after client-side mount to avoid hydration mismatch
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // During SSR and before mount, return null (stable placeholder)
-  if (!mounted || !isAdmin) {
-    return null
-  }
 
   const handleDebug = async () => {
     setLoading(true)

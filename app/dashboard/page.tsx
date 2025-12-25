@@ -210,7 +210,8 @@ export default async function DashboardPage({
                   : 'Cost overview across all your organizations'}
               </p>
             </div>
-            <DebugCostsButton isAdmin={isAdminUser} />
+            {/* Only render DebugCostsButton if user is admin (server-side gating) */}
+            {isAdminUser && <DebugCostsButton />}
           </div>
 
           {/* Setup Complete Banner */}
