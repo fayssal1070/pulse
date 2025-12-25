@@ -57,9 +57,18 @@ export async function POST(
 
     // Perform sync with force=true to allow manual sync even if recently synced
     // The lock DB will still prevent parallel syncs on the same account
+    const syncStartTime = new Date()
     const result = await syncCloudAccountCosts(id, true)
 
     if (!result.success) {
+      // Log failed sync
+      console.log('[SYNC_MANUAL]', JSON.stringify({
+        orgId,
+        cloudAccountId: id,
+        timestamp: syncStartTime.toISOString(),
+        success: false,
+        error: result.error,
+      }))
       return NextResponse.json(
         {
           success: false,
@@ -68,6 +77,17 @@ export async function POST(
         { status: 500 }
       )
     }
+
+    // Log successful sync
+    console.log('[SYNC_MANUAL]', JSON.stringify({
+      orgId,
+      cloudAccountId: id,
+      timestamp: syncStartTime.toISOString(),
+      success: true,
+      recordsCount: result.recordsCount,
+      totalAmount: result.totalAmount,
+      services: result.services,
+    }))
 
     return NextResponse.json({
       success: true,

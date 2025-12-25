@@ -37,15 +37,38 @@ export async function GET(request: NextRequest) {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
     thirtyDaysAgo.setHours(0, 0, 0, 0)
 
-    const sum30d = await prisma.costRecord.aggregate({
-      where: {
-        orgId,
-        date: { gte: thirtyDaysAgo },
-      },
-      _sum: {
-        amountEUR: true,
-      },
-    })
+    const [sum30d, count30d, awsAccount] = await Promise.all([
+      prisma.costRecord.aggregate({
+        where: {
+          orgId,
+          date: { gte: thirtyDaysAgo },
+        },
+        _sum: {
+          amountEUR: true,
+        },
+      }),
+      prisma.costRecord.count({
+        where: {
+          orgId,
+          date: { gte: thirtyDaysAgo },
+        },
+      }),
+      prisma.cloudAccount.findFirst({
+        where: {
+          orgId,
+          provider: 'AWS',
+          connectionType: 'COST_EXPLORER',
+          status: 'active',
+        },
+        select: {
+          id: true,
+          lastSyncedAt: true,
+        },
+        orderBy: {
+          lastSyncedAt: 'desc',
+        },
+      }),
+    ])
 
     return NextResponse.json({
       orgId,
@@ -53,6 +76,11 @@ export async function GET(request: NextRequest) {
       minDate: dateStats._min.date?.toISOString() || null,
       maxDate: dateStats._max.date?.toISOString() || null,
       sum_30d: sum30d._sum.amountEUR || 0,
+      count_30d: count30d,
+      awsAccount: awsAccount ? {
+        id: awsAccount.id,
+        lastSyncedAt: awsAccount.lastSyncedAt?.toISOString() || null,
+      } : null,
     })
   } catch (error) {
     console.error('Debug costs error:', error)
