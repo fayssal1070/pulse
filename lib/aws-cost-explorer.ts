@@ -162,29 +162,39 @@ export async function fetchDailyCosts(
 
     hasAnyResults = true
 
-    // Debug: Log first result structure
-    if (isDebug && !firstResultLogged && response.ResultsByTime.length > 0) {
+    // Capture first result Total for debug (only once)
+    if (!firstResultLogged && response.ResultsByTime.length > 0) {
       const firstResult = response.ResultsByTime[0]
-      console.log('[AWS_SYNC_DEBUG]', JSON.stringify({
-        metric: 'UnblendedCost',
-        firstResultTimePeriod: firstResult.TimePeriod,
-        firstResultTotal: firstResult.Total ? {
-          UnblendedCost: {
-            Amount: firstResult.Total.UnblendedCost?.Amount,
-            Unit: firstResult.Total.UnblendedCost?.Unit,
-          },
-        } : null,
-        firstGroup: firstResult.Groups && firstResult.Groups.length > 0 ? {
-          Keys: firstResult.Groups[0].Keys,
-          Metrics: firstResult.Groups[0].Metrics ? {
+      if (firstResult.Total && firstResult.Total.UnblendedCost) {
+        firstResultTotal = {
+          amount: firstResult.Total.UnblendedCost.Amount || '0',
+          unit: firstResult.Total.UnblendedCost.Unit || 'USD',
+        }
+      }
+
+      // Debug: Log first result structure
+      if (isDebug) {
+        console.log('[AWS_SYNC_DEBUG]', JSON.stringify({
+          metric: 'UnblendedCost',
+          firstResultTimePeriod: firstResult.TimePeriod,
+          firstResultTotal: firstResult.Total ? {
             UnblendedCost: {
-              Amount: firstResult.Groups[0].Metrics.UnblendedCost?.Amount,
-              Unit: firstResult.Groups[0].Metrics.UnblendedCost?.Unit,
+              Amount: firstResult.Total.UnblendedCost?.Amount,
+              Unit: firstResult.Total.UnblendedCost?.Unit,
             },
           } : null,
-        } : null,
-        totalResultsByTime: response.ResultsByTime.length,
-      }))
+          firstGroup: firstResult.Groups && firstResult.Groups.length > 0 ? {
+            Keys: firstResult.Groups[0].Keys,
+            Metrics: firstResult.Groups[0].Metrics ? {
+              UnblendedCost: {
+                Amount: firstResult.Groups[0].Metrics.UnblendedCost?.Amount,
+                Unit: firstResult.Groups[0].Metrics.UnblendedCost?.Unit,
+              },
+            } : null,
+          } : null,
+          totalResultsByTime: response.ResultsByTime.length,
+        }))
+      }
       firstResultLogged = true
     }
 
