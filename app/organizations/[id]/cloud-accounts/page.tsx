@@ -126,13 +126,17 @@ export default async function CloudAccountsPage({
                           <span className="font-medium">Provider:</span> {account.provider}
                         </p>
                         {account.connectionType === 'COST_EXPLORER' && (
-                          <div className="mt-2">
+                          <div className="mt-2 space-y-1">
                             <p>
                               <span className="font-medium">Auto-sync:</span>{' '}
                               <span className="text-green-600">once daily</span>
                             </p>
-                            <p className="text-xs text-gray-600 mt-1 italic">
-                              AWS Cost Explorer met à jour les données environ toutes les 24h, mais vous pouvez relancer une synchronisation à tout moment.
+                            <p>
+                              <span className="font-medium">Manual:</span>{' '}
+                              <span className="text-blue-600">Sync Now anytime</span>
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Note: AWS updates ~24h
                             </p>
                           </div>
                         )}

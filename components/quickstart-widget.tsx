@@ -33,16 +33,16 @@ export default function QuickstartWidget({
         },
         {
           num: 2,
-          label: 'AWS Cost Explorer updates every ~24h',
+          label: 'Auto-sync: once daily',
           completed: false, // Info step
           action: (
-            <span className="text-xs text-gray-500">Auto-sync enabled</span>
+            <span className="text-xs text-gray-500">Enabled</span>
           ),
         },
         {
           num: 3,
-          label: 'Sync now',
-          completed: false,
+          label: 'Manual: Sync Now anytime',
+          completed: hasCostData, // Mark as completed if data exists
           action: organizationId ? (
             <Link
               href={`/organizations/${organizationId}/cloud-accounts`}
@@ -130,13 +130,26 @@ export default function QuickstartWidget({
         },
       ]
 
-  // Add "Last synced" info if AWS is connected
-  const lastSyncedInfo = hasActiveAWS && awsAccountInfo?.lastSyncedAt ? (
-    <div className="mt-2 text-xs text-gray-600">
-      Last synced: {new Date(awsAccountInfo.lastSyncedAt).toLocaleString()}
+  // Add sync info if AWS is connected
+  const syncInfo = hasActiveAWS ? (
+    <div className="mt-3 pt-3 border-t border-blue-200">
+      <div className="text-xs text-gray-600 space-y-1">
+        <p>
+          <span className="font-medium">Auto-sync:</span> once daily
+        </p>
+        <p>
+          <span className="font-medium">Manual:</span> Sync Now anytime
+        </p>
+        <p className="text-gray-500 italic">
+          Note: AWS updates ~24h
+        </p>
+        {awsAccountInfo?.lastSyncedAt && (
+          <p className="text-gray-500 mt-1">
+            Last synced: {new Date(awsAccountInfo.lastSyncedAt).toLocaleString()}
+          </p>
+        )}
+      </div>
     </div>
-  ) : hasActiveAWS ? (
-    <div className="mt-2 text-xs text-gray-500">Never synced</div>
   ) : null
 
   const completedCount = steps.filter(s => s.completed).length
@@ -192,7 +205,7 @@ export default function QuickstartWidget({
         ))}
       </div>
 
-      {lastSyncedInfo}
+      {syncInfo}
 
       {completedCount === totalSteps && (
         <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded-lg">
