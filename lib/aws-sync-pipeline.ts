@@ -183,12 +183,32 @@ export async function syncCloudAccountCosts(
     const startDate = new Date(endDate)
     startDate.setDate(startDate.getDate() - SYNC_CONFIG.AWS_SYNC_LOOKBACK_DAYS)
 
-  const costData = await fetchDailyCosts(
+  const fetchResult = await fetchDailyCosts(
     cloudAccount.roleArn,
     cloudAccount.externalId,
     startDate,
     endDate
   )
+  const costData = fetchResult.costData
+  const fetchMetadata = fetchResult.fetchMetadata
+
+  // Store fetch metadata in CloudAccount for debug endpoint
+  await prisma.cloudAccount.update({
+    where: { id: cloudAccountId },
+    data: {
+      notes: JSON.stringify({
+        lastAwsFetch: {
+          start: fetchMetadata.timePeriod.start,
+          end: fetchMetadata.timePeriod.end,
+          metric: fetchMetadata.metric,
+          totalFromAws: fetchMetadata.totalFromAws,
+          currencyFromAws: fetchMetadata.currencyFromAws,
+          recordCount: fetchMetadata.recordCount,
+          fetchedAt: new Date().toISOString(),
+        },
+      }),
+    },
+  })
 
   // Group by date and service
   const dailyTotals = new Map<string, { service: string; amount: number; currency: string }>()
@@ -239,6 +259,8 @@ export async function syncCloudAccountCosts(
   // Upsert cost records
   let upsertedCount = 0
   let totalAmountEURInserted = 0
+  let skippedZeroRecords = 0
+  
   for (const [key, data] of dailyTotals) {
     const [dateStr] = key.split(':')
     const date = new Date(dateStr + 'T00:00:00Z')
@@ -246,6 +268,28 @@ export async function syncCloudAccountCosts(
     // Convert to EUR if needed
     const amountEUR = data.currency === 'EUR' ? data.amount : data.amount * 0.92
     const roundedAmountEUR = Math.round(amountEUR * 100) / 100
+
+    // Safety check: Don't write amountEUR=0 if AWS returned amount > 0
+    if (roundedAmountEUR === 0 && data.amount > 0) {
+      if (isDebug) {
+        console.warn(`[AWS_SYNC_DEBUG] Skipping record with amountEUR=0 but AWS amount=${data.amount}: ${key}`)
+      }
+      skippedZeroRecords++
+      continue
+    }
+
+    // Log before create (debug mode)
+    if (isDebug) {
+      console.log('[AWS_SYNC_DEBUG]', JSON.stringify({
+        stage: 'db_insert',
+        key,
+        date: dateStr,
+        service: data.service,
+        amountFromAws: data.amount,
+        currencyFromAws: data.currency,
+        amountEUR: roundedAmountEUR,
+      }))
+    }
 
     // Use upsert to avoid duplicates (based on orgId + date + provider + service)
     // Since we don't have a unique constraint, we'll delete and recreate for simplicity
@@ -276,12 +320,18 @@ export async function syncCloudAccountCosts(
     upsertedCount++
   }
 
+  // Log skipped records
+  if (isDebug && skippedZeroRecords > 0) {
+    console.warn(`[AWS_SYNC_DEBUG] Skipped ${skippedZeroRecords} records with amountEUR=0 but AWS amount > 0`)
+  }
+
   // Debug: Log after DB insert
   if (isDebug) {
     console.log('[AWS_SYNC_DEBUG]', JSON.stringify({
       stage: 'after_db_insert',
       upsertedCount,
       totalAmountEURInserted,
+      skippedZeroRecords,
     }))
   }
 

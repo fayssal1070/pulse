@@ -66,12 +66,26 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           lastSyncedAt: true,
+          notes: true,
         },
         orderBy: {
           lastSyncedAt: 'desc',
         },
       }),
     ])
+
+    // Parse lastAwsFetch from CloudAccount notes
+    let lastAwsFetch = null
+    if (awsAccount?.notes) {
+      try {
+        const notes = JSON.parse(awsAccount.notes)
+        if (notes.lastAwsFetch) {
+          lastAwsFetch = notes.lastAwsFetch
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
 
     return NextResponse.json({
       orgId,
@@ -84,6 +98,7 @@ export async function GET(request: NextRequest) {
         id: awsAccount.id,
         lastSyncedAt: awsAccount.lastSyncedAt?.toISOString() || null,
       } : null,
+      lastAwsFetch,
       deployment: {
         env: process.env.VERCEL_ENV || 'development',
         commitSha: process.env.VERCEL_GIT_COMMIT_SHA || 'local',

@@ -21,6 +21,14 @@ export interface AWSSyncResult {
   services: string[]
 }
 
+export interface AWSFetchMetadata {
+  timePeriod: { start: string; end: string }
+  metric: string
+  totalFromAws: number
+  currencyFromAws: string
+  recordCount: number
+}
+
 /**
  * Assume an AWS role and return credentials
  */
@@ -49,13 +57,14 @@ async function assumeRole(roleArn: string, externalId: string) {
 
 /**
  * Fetch daily costs for the last 30 days grouped by service
+ * Returns cost data and fetch metadata for debugging
  */
 export async function fetchDailyCosts(
   roleArn: string,
   externalId: string,
   startDate: Date,
   endDate: Date
-): Promise<AWSCostData[]> {
+): Promise<{ costData: AWSCostData[]; fetchMetadata: AWSFetchMetadata }> {
   // Assume role
   const credentials = await assumeRole(roleArn, externalId)
 
@@ -80,13 +89,14 @@ export async function fetchDailyCosts(
   const endDateStr = formatDate(endDate)
 
   // Fetch cost and usage data
+  const metric = 'UnblendedCost'
   const params: GetCostAndUsageCommandInput = {
     TimePeriod: {
       Start: startDateStr,
       End: endDateStr,
     },
     Granularity: 'DAILY',
-    Metrics: ['UnblendedCost'],
+    Metrics: [metric],
     GroupBy: [
       {
         Type: 'DIMENSION',
@@ -99,10 +109,25 @@ export async function fetchDailyCosts(
     ],
   }
 
-  const isDebug = process.env.AWS_SYNC_DEBUG === '1'
+  const isDebug = process.env.AWS_SYNC_DEBUG === '1' || process.env.AWS_SYNC_DEBUG === 'true'
+  
+  // Log request parameters
+  if (isDebug) {
+    console.log('[AWS_SYNC_DEBUG]', JSON.stringify({
+      stage: 'fetch_request',
+      timePeriod: {
+        start: startDateStr,
+        end: endDateStr,
+      },
+      metric,
+      granularity: 'DAILY',
+    }))
+  }
+
   let nextToken: string | undefined
   let firstResultLogged = false
   let hasAnyResults = false
+  let sampleServices: Array<{ service: string; amount: string; unit: string }> = []
 
   do {
     const command = new GetCostAndUsageCommand({
@@ -162,16 +187,39 @@ export async function fetchDailyCosts(
         const service = group.Keys?.[0] || 'Unknown'
         const rawAmountString = group.Metrics?.UnblendedCost?.Amount || '0'
         const rawUnit = group.Metrics?.UnblendedCost?.Unit || 'USD'
-        const amount = parseFloat(rawAmountString)
+        
+        // Improved parsing: handle comma/point, empty strings, NaN
+        let amount: number
+        if (!rawAmountString || rawAmountString.trim() === '') {
+          amount = 0
+        } else {
+          // Replace comma with point for European number format
+          const normalizedAmount = rawAmountString.replace(',', '.')
+          amount = parseFloat(normalizedAmount)
+          if (isNaN(amount)) {
+            console.warn(`[AWS_SYNC_DEBUG] Failed to parse amount: "${rawAmountString}" for service ${service}`)
+            amount = 0
+          }
+        }
 
-        // Debug: Log raw values
-        if (isDebug) {
+        // Collect sample services for debug (max 3)
+        if (isDebug && sampleServices.length < 3 && rawAmountString !== '0') {
+          sampleServices.push({
+            service,
+            amount: rawAmountString,
+            unit: rawUnit,
+          })
+        }
+
+        // Debug: Log raw values (only for first few or non-zero)
+        if (isDebug && (sampleServices.length <= 3 || amount > 0)) {
           console.log('[AWS_SYNC_DEBUG]', JSON.stringify({
             date,
             service,
             rawAmountString,
             rawUnit,
             parsedAmount: amount,
+            isNaN: isNaN(amount),
             amountGreaterThanZero: amount > 0,
           }))
         }
@@ -203,20 +251,45 @@ export async function fetchDailyCosts(
   } while (nextToken)
 
   // Debug: Log final summary
+  const finalTotalAmount = costData.reduce((sum, r) => sum + r.amount, 0)
   if (isDebug) {
     console.log('[AWS_SYNC_DEBUG]', JSON.stringify({
+      stage: 'fetch_complete',
       finalTotalRecords: costData.length,
-      finalTotalAmount: costData.reduce((sum, r) => sum + r.amount, 0),
+      finalTotalAmount,
+      currency: costData.length > 0 ? costData[0].currency : 'USD',
       services: [...new Set(costData.map(r => r.service))],
       hasAnyResults,
+      sampleServices: sampleServices.slice(0, 3),
     }))
+  }
+
+  // Return fetch metadata for debug endpoint
+  return {
+    costData,
+    fetchMetadata: {
+      timePeriod: { start: startDateStr, end: endDateStr },
+      metric,
+      totalFromAws: finalTotalAmount,
+      currencyFromAws: costData.length > 0 ? costData[0].currency : 'USD',
+      recordCount: costData.length,
+    },
   }
 
   // If we got ResultsByTime but no cost data, it means no costs (not a pending state)
   // If we got no ResultsByTime at all, it might indicate Cost Explorer is not ready
   // But we can't distinguish here, so we return empty array and let the caller check
 
-  return costData
+  return {
+    costData,
+    fetchMetadata: {
+      timePeriod: { start: startDateStr, end: endDateStr },
+      metric,
+      totalFromAws: finalTotalAmount,
+      currencyFromAws: costData.length > 0 ? costData[0].currency : 'USD',
+      recordCount: costData.length,
+    },
+  }
 }
 
 /**
@@ -230,7 +303,8 @@ export async function fetchMTDCosts(
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
-  return fetchDailyCosts(roleArn, externalId, startOfMonth, endOfMonth)
+  const result = await fetchDailyCosts(roleArn, externalId, startOfMonth, endOfMonth)
+  return result.costData
 }
 
 /**
@@ -248,7 +322,8 @@ export async function syncAWSCosts(
     const startDate = new Date(endDate)
     startDate.setDate(startDate.getDate() - 30) // 30 days ago
 
-    const costData = await fetchDailyCosts(roleArn, externalId, startDate, endDate)
+    const fetchResult = await fetchDailyCosts(roleArn, externalId, startDate, endDate)
+    const costData = fetchResult.costData
 
     // If no cost data, it means no costs (not an error, not pending)
     if (costData.length === 0) {
