@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Info } from 'lucide-react'
 
 /**
@@ -8,12 +8,20 @@ import { Info } from 'lucide-react'
  * 
  * IMPORTANT: This component is only rendered server-side if user is admin.
  * No gating logic here - if this component is mounted, user is admin.
+ * 
+ * The modal is only rendered client-side after user interaction to avoid hydration issues.
  */
 export default function BuildInfoButton() {
+  const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
+
+  // Only render modal after client-side mount to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleBuildInfo = async () => {
     setLoading(true)
@@ -57,7 +65,8 @@ export default function BuildInfoButton() {
         {loading ? 'Loading...' : 'Build info'}
       </button>
 
-      {showModal && (
+      {/* Only render modal after client-side mount to avoid hydration mismatch */}
+      {mounted && showModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto" onClick={() => setShowModal(false)}>
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" />
