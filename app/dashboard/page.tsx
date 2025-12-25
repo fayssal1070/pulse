@@ -95,26 +95,41 @@ export default async function DashboardPage({
     }
   }
 
-  // Check for "Data pending" state: AWS synced but no cost data in last 30 days
+  // Check for banner states: Data Pending vs No Costs
   let showDataPendingBanner = false
-  if (hasActiveAWS && awsAccountInfo?.lastSyncedAt && activeOrgId) {
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    thirtyDaysAgo.setHours(0, 0, 0, 0)
+  let showNoCostsBanner = false
+  let bannerMessage = ''
 
-    const sum30d = await prisma.costRecord.aggregate({
+  if (hasActiveAWS && activeOrgId) {
+    // Get the AWS account with lastSyncError to check error codes
+    const awsAccount = await prisma.cloudAccount.findFirst({
       where: {
         orgId: activeOrgId,
-        date: { gte: thirtyDaysAgo },
+        provider: 'AWS',
+        connectionType: 'COST_EXPLORER',
+        status: 'active',
       },
-      _sum: {
-        amountEUR: true,
+      select: {
+        lastSyncedAt: true,
+        lastSyncError: true,
+      },
+      orderBy: {
+        lastSyncedAt: 'desc',
       },
     })
 
-    // If synced but no data in last 30 days, show pending banner
-    if ((sum30d._sum.amountEUR || 0) === 0) {
-      showDataPendingBanner = true
+    if (awsAccount?.lastSyncedAt) {
+      const lastSyncError = awsAccount.lastSyncError || ''
+      
+      // Check for specific error codes
+      if (lastSyncError.includes('[AWS_COST_EXPLORER_NOT_READY]') ||
+          lastSyncError.includes('[AWS_COST_EXPLORER_NOT_ENABLED]')) {
+        showDataPendingBanner = true
+        bannerMessage = 'AWS Cost Explorer peut prendre jusqu\'à 24h pour préparer les données lors de la première activation. Réessaie plus tard.'
+      } else if (lastSyncError.includes('[AWS_NO_COSTS]')) {
+        showNoCostsBanner = true
+        bannerMessage = 'Aucune dépense détectée sur la période.'
+      }
     }
   }
 
@@ -197,7 +212,7 @@ export default async function DashboardPage({
             <DemoBanner organizationId={activeOrgId} />
           )}
 
-          {/* Data Pending Banner (AWS synced but no data yet) */}
+          {/* Data Pending Banner (Cost Explorer not ready) */}
           {showDataPendingBanner && (
             <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
               <div className="flex">
@@ -208,7 +223,25 @@ export default async function DashboardPage({
                 </div>
                 <div className="ml-3">
                   <p className="text-sm text-yellow-700">
-                    <span className="font-medium">Data Pending</span> - AWS Cost Explorer peut prendre jusqu'à 24h pour préparer les données lors de la première activation. Réessaie plus tard.
+                    <span className="font-medium">Data Pending</span> - {bannerMessage}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* No Costs Banner (AWS synced but no costs detected) */}
+          {showNoCostsBanner && (
+            <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-blue-700">
+                    <span className="font-medium">Info</span> - {bannerMessage}
                   </p>
                 </div>
               </div>

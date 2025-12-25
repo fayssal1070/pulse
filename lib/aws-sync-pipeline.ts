@@ -137,12 +137,17 @@ export async function syncCloudAccountCosts(
   )
 
   if (!syncResult.success) {
+    // Store error code in lastSyncError for dashboard logic
+    const errorMessage = syncResult.error || 'Unknown error'
+    const errorCode = syncResult.errorCode ? `[${syncResult.errorCode}]` : ''
+    const fullError = errorCode ? `${errorCode} ${errorMessage}` : errorMessage
+
     // Update cloud account with error
     await prisma.cloudAccount.update({
       where: { id: cloudAccountId },
       data: {
         status: 'error',
-        lastSyncError: syncResult.error || 'Unknown error',
+        lastSyncError: fullError,
         lastSyncedAt: new Date(),
       },
     })
@@ -153,8 +158,21 @@ export async function syncCloudAccountCosts(
       success: false,
       recordsCount: 0,
       totalAmount: 0,
-      error: syncResult.error,
+      error: errorMessage,
     }
+  }
+
+  // Handle case where sync succeeded but no costs (AWS_NO_COSTS)
+  if (syncResult.success && syncResult.errorCode === 'AWS_NO_COSTS') {
+    // Update cloud account to indicate no costs (not an error)
+    await prisma.cloudAccount.update({
+      where: { id: cloudAccountId },
+      data: {
+        status: 'active',
+        lastSyncError: '[AWS_NO_COSTS] No costs detected for the period',
+        lastSyncedAt: new Date(),
+      },
+    })
   }
 
     // Upsert cost records

@@ -17,6 +17,7 @@ export interface AWSSyncResult {
   recordsCount: number
   totalAmount: number
   error?: string
+  errorCode?: 'AWS_COST_EXPLORER_NOT_READY' | 'AWS_COST_EXPLORER_NOT_ENABLED' | 'AWS_NO_COSTS'
   services: string[]
 }
 
@@ -101,6 +102,7 @@ export async function fetchDailyCosts(
   const isDebug = process.env.AWS_SYNC_DEBUG === '1'
   let nextToken: string | undefined
   let firstResultLogged = false
+  let hasAnyResults = false
 
   do {
     const command = new GetCostAndUsageCommand({
@@ -110,12 +112,16 @@ export async function fetchDailyCosts(
 
     const response = await costExplorerClient.send(command)
 
-    if (!response.ResultsByTime) {
+    if (!response.ResultsByTime || response.ResultsByTime.length === 0) {
       if (isDebug) {
         console.log('[AWS_SYNC_DEBUG] No ResultsByTime in response')
       }
+      // If no ResultsByTime at all, this might indicate Cost Explorer is not ready
+      // But we'll let the caller decide based on whether we got any data
       break
     }
+
+    hasAnyResults = true
 
     // Debug: Log first result structure
     if (isDebug && !firstResultLogged && response.ResultsByTime.length > 0) {
@@ -202,8 +208,13 @@ export async function fetchDailyCosts(
       finalTotalRecords: costData.length,
       finalTotalAmount: costData.reduce((sum, r) => sum + r.amount, 0),
       services: [...new Set(costData.map(r => r.service))],
+      hasAnyResults,
     }))
   }
+
+  // If we got ResultsByTime but no cost data, it means no costs (not a pending state)
+  // If we got no ResultsByTime at all, it might indicate Cost Explorer is not ready
+  // But we can't distinguish here, so we return empty array and let the caller check
 
   return costData
 }
@@ -239,11 +250,13 @@ export async function syncAWSCosts(
 
     const costData = await fetchDailyCosts(roleArn, externalId, startDate, endDate)
 
+    // If no cost data, it means no costs (not an error, not pending)
     if (costData.length === 0) {
       return {
         success: true,
         recordsCount: 0,
         totalAmount: 0,
+        errorCode: 'AWS_NO_COSTS',
         services: [],
       }
     }
@@ -307,11 +320,25 @@ export async function syncAWSCosts(
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    
+    // Detect specific AWS Cost Explorer errors
+    let errorCode: 'AWS_COST_EXPLORER_NOT_READY' | 'AWS_COST_EXPLORER_NOT_ENABLED' | undefined
+    
+    if (errorMessage.includes('User not enabled for cost explorer access') ||
+        errorMessage.includes('Cost Explorer is not enabled')) {
+      errorCode = 'AWS_COST_EXPLORER_NOT_ENABLED'
+    } else if (errorMessage.includes('data is not available yet') ||
+               errorMessage.includes('Cost Explorer initialization') ||
+               errorMessage.includes('not ready')) {
+      errorCode = 'AWS_COST_EXPLORER_NOT_READY'
+    }
+    
     return {
       success: false,
       recordsCount: 0,
       totalAmount: 0,
       error: errorMessage,
+      errorCode,
       services: [],
     }
   }
