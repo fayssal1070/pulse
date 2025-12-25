@@ -7,74 +7,137 @@ interface QuickstartWidgetProps {
   hasCostData: boolean
   hasAlerts: boolean
   organizationId: string | null
+  hasActiveAWS?: boolean
+  awsAccountInfo?: { lastSyncedAt: Date | null } | null
 }
 
 export default function QuickstartWidget({
   hasCostData,
   hasAlerts,
   organizationId,
+  hasActiveAWS = false,
+  awsAccountInfo = null,
 }: QuickstartWidgetProps) {
   const router = useRouter()
 
-  const steps = [
-    {
-      num: 1,
-      label: 'Download CSV template',
-      completed: false, // Always show as info (can't track downloads)
-      action: (
-        <a
-          href="/api/csv/template"
-          download="pulse-import-template.csv"
-          className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-        >
-          Download →
-        </a>
-      ),
-    },
-    {
-      num: 2,
-      label: 'Learn how to export CSV from your cloud provider',
-      completed: false, // Always show as info
-      action: (
-        <Link
-          href="/help/import-csv"
-          className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-        >
-          View Guide →
-        </Link>
-      ),
-    },
-    {
-      num: 3,
-      label: 'Import your cost data',
-      completed: hasCostData,
-      action: organizationId ? (
-        <Link
-          href="/import"
-          className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-        >
-          Import CSV →
-        </Link>
-      ) : (
-        <span className="text-xs text-gray-400">Create organization first</span>
-      ),
-    },
-    {
-      num: 4,
-      label: 'Create your first alert',
-      completed: hasAlerts,
-      action: organizationId ? (
-        <Link
-          href={`/organizations/${organizationId}/alerts`}
-          className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-        >
-          Create Alert →
-        </Link>
-      ) : (
-        <span className="text-xs text-gray-400">Create organization first</span>
-      ),
-    },
-  ]
+  // If AWS is connected, show AWS-specific steps
+  const steps = hasActiveAWS
+    ? [
+        {
+          num: 1,
+          label: 'AWS connected',
+          completed: true,
+          action: (
+            <span className="text-xs text-green-600 font-medium">✓ Connected</span>
+          ),
+        },
+        {
+          num: 2,
+          label: 'AWS Cost Explorer updates every ~24h',
+          completed: false, // Info step
+          action: (
+            <span className="text-xs text-gray-500">Auto-sync enabled</span>
+          ),
+        },
+        {
+          num: 3,
+          label: 'Sync now',
+          completed: false,
+          action: organizationId ? (
+            <Link
+              href={`/organizations/${organizationId}/cloud-accounts`}
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Sync Now →
+            </Link>
+          ) : (
+            <span className="text-xs text-gray-400">N/A</span>
+          ),
+        },
+        {
+          num: 4,
+          label: 'Create your first alert',
+          completed: hasAlerts,
+          action: organizationId ? (
+            <Link
+              href={`/organizations/${organizationId}/alerts`}
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Create Alert →
+            </Link>
+          ) : (
+            <span className="text-xs text-gray-400">Create organization first</span>
+          ),
+        },
+      ]
+    : [
+        {
+          num: 1,
+          label: 'Download CSV template',
+          completed: false, // Always show as info (can't track downloads)
+          action: (
+            <a
+              href="/api/csv/template"
+              download="pulse-import-template.csv"
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Download →
+            </a>
+          ),
+        },
+        {
+          num: 2,
+          label: 'Learn how to export CSV from your cloud provider',
+          completed: false, // Always show as info
+          action: (
+            <Link
+              href="/help/import-csv"
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+            >
+              View Guide →
+            </Link>
+          ),
+        },
+        {
+          num: 3,
+          label: 'Import your cost data',
+          completed: hasCostData,
+          action: organizationId ? (
+            <Link
+              href="/import"
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Import CSV →
+            </Link>
+          ) : (
+            <span className="text-xs text-gray-400">Create organization first</span>
+          ),
+        },
+        {
+          num: 4,
+          label: 'Create your first alert',
+          completed: hasAlerts,
+          action: organizationId ? (
+            <Link
+              href={`/organizations/${organizationId}/alerts`}
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Create Alert →
+            </Link>
+          ) : (
+            <span className="text-xs text-gray-400">Create organization first</span>
+          ),
+        },
+      ]
+
+  // Add "Last synced" info if AWS is connected
+  const lastSyncedInfo = hasActiveAWS && awsAccountInfo?.lastSyncedAt ? (
+    <div className="mt-2 text-xs text-gray-600">
+      Last synced: {new Date(awsAccountInfo.lastSyncedAt).toLocaleString()}
+    </div>
+  ) : hasActiveAWS ? (
+    <div className="mt-2 text-xs text-gray-500">Never synced</div>
+  ) : null
 
   const completedCount = steps.filter(s => s.completed).length
   const totalSteps = steps.length
@@ -128,6 +191,8 @@ export default function QuickstartWidget({
           </div>
         ))}
       </div>
+
+      {lastSyncedInfo}
 
       {completedCount === totalSteps && (
         <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded-lg">

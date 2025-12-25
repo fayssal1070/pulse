@@ -63,16 +63,35 @@ export default async function DashboardPage({
 
   // Get cloud accounts count and status
   let cloudAccountsInfo = null
+  let hasActiveAWS = false
+  let awsAccountInfo = null
   if (activeOrgId) {
     const accounts = await prisma.cloudAccount.findMany({
       where: { orgId: activeOrgId },
-      select: { status: true },
+      select: { 
+        status: true,
+        provider: true,
+        connectionType: true,
+        lastSyncedAt: true,
+      },
     })
     cloudAccountsInfo = {
       total: accounts.length,
       active: accounts.filter(a => a.status === 'active').length,
       pending: accounts.filter(a => a.status === 'pending').length,
       disabled: accounts.filter(a => a.status === 'disabled').length,
+    }
+    // Check if there's an active AWS Cost Explorer account
+    const awsAccount = accounts.find(
+      a => a.provider === 'AWS' && 
+           a.connectionType === 'COST_EXPLORER' && 
+           a.status === 'active'
+    )
+    hasActiveAWS = !!awsAccount
+    if (awsAccount) {
+      awsAccountInfo = {
+        lastSyncedAt: awsAccount.lastSyncedAt,
+      }
     }
   }
 
@@ -171,6 +190,8 @@ export default async function DashboardPage({
               hasCostData={hasCostData}
               hasAlerts={hasAlerts}
               organizationId={activeOrgId}
+              hasActiveAWS={hasActiveAWS}
+              awsAccountInfo={awsAccountInfo}
             />
           )}
 
