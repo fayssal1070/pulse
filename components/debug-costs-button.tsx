@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Bug } from 'lucide-react'
 
 interface DebugCostsButtonProps {
@@ -8,14 +8,19 @@ interface DebugCostsButtonProps {
 }
 
 export default function DebugCostsButton({ isAdmin }: DebugCostsButtonProps) {
+  const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
 
-  // Don't render anything if not admin - this is safe because isAdmin is passed from server
-  // and won't change between SSR and CSR
-  if (!isAdmin) {
+  // Only render after client-side mount to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // During SSR and before mount, return null (stable placeholder)
+  if (!mounted || !isAdmin) {
     return null
   }
 
