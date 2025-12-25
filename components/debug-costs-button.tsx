@@ -19,6 +19,7 @@ export default function DebugCostsButton() {
   const [data, setData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [activeTab, setActiveTab] = useState<'summary' | 'aws-raw'>('summary')
 
   // Only render modal after client-side mount to avoid hydration mismatch
   useEffect(() => {
@@ -167,41 +168,196 @@ export default function DebugCostsButton() {
 
                 {data && (
                   <div className="space-y-4">
-                    {/* Key metrics highlighted */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <p className="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">
-                          Sum (30 days)
-                        </p>
-                        <p className="text-2xl font-bold text-blue-900">
-                          {data.sum_30d?.toFixed(2) || '0.00'} EUR
-                        </p>
-                      </div>
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <p className="text-xs font-medium text-green-600 uppercase tracking-wide mb-1">
-                          Count (30 days)
-                        </p>
-                        <p className="text-2xl font-bold text-green-900">
-                          {data.count_30d || 0}
-                        </p>
-                      </div>
+                    {/* Tabs */}
+                    <div className="border-b border-gray-200">
+                      <nav className="-mb-px flex space-x-8">
+                        <button
+                          onClick={() => setActiveTab('summary')}
+                          className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                            activeTab === 'summary'
+                              ? 'border-blue-500 text-blue-600'
+                              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          Summary
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('aws-raw')}
+                          className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                            activeTab === 'aws-raw'
+                              ? 'border-blue-500 text-blue-600'
+                              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          AWS Raw
+                        </button>
+                      </nav>
                     </div>
 
-                    {/* Full JSON */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-medium text-gray-700">Full Response:</p>
-                        <button
-                          onClick={handleCopyJSON}
-                          className="px-3 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                        >
-                          Copy JSON
-                        </button>
+                    {/* Tab Content */}
+                    {activeTab === 'summary' && (
+                      <>
+                        {/* Key metrics highlighted */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <p className="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">
+                              Sum (30 days)
+                            </p>
+                            <p className="text-2xl font-bold text-blue-900">
+                              {data.sum_30d?.toFixed(2) || '0.00'} EUR
+                            </p>
+                          </div>
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <p className="text-xs font-medium text-green-600 uppercase tracking-wide mb-1">
+                              Count (30 days)
+                            </p>
+                            <p className="text-2xl font-bold text-green-900">
+                              {data.count_30d || 0}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Full JSON */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm font-medium text-gray-700">Full Response:</p>
+                            <button
+                              onClick={handleCopyJSON}
+                              className="px-3 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                            >
+                              Copy JSON
+                            </button>
+                          </div>
+                          <pre className="bg-gray-50 border border-gray-200 rounded-md p-4 text-xs overflow-x-auto max-h-96">
+                            {JSON.stringify(data, null, 2)}
+                          </pre>
+                        </div>
+                      </>
+                    )}
+
+                    {activeTab === 'aws-raw' && (
+                      <div className="space-y-4">
+                        {data.lastAwsFetch ? (
+                          <>
+                            {/* Request Parameters */}
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                              <h4 className="text-sm font-semibold text-gray-900 mb-3">Request Parameters</h4>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Start:</span>
+                                  <span className="font-mono text-gray-900">{data.lastAwsFetch.start || data.lastAwsFetch.timePeriod?.start || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">End:</span>
+                                  <span className="font-mono text-gray-900">{data.lastAwsFetch.end || data.lastAwsFetch.timePeriod?.end || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Metric:</span>
+                                  <span className="font-mono text-gray-900">{data.lastAwsFetch.metric || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Granularity:</span>
+                                  <span className="font-mono text-gray-900">{data.lastAwsFetch.granularity || 'DAILY'}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* First Result Total */}
+                            {data.lastAwsFetch.firstResultTotalAmount && (
+                              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <h4 className="text-sm font-semibold text-blue-900 mb-3">First Result Total (from AWS)</h4>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex justify-between">
+                                    <span className="text-blue-600">Amount:</span>
+                                    <span className="font-mono font-bold text-blue-900">{data.lastAwsFetch.firstResultTotalAmount}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-blue-600">Unit:</span>
+                                    <span className="font-mono text-blue-900">{data.lastAwsFetch.firstResultTotalUnit || 'USD'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Sample Groups */}
+                            {data.lastAwsFetch.sampleGroups && data.lastAwsFetch.sampleGroups.length > 0 && (
+                              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <h4 className="text-sm font-semibold text-green-900 mb-3">Sample Groups (3 services from AWS)</h4>
+                                <div className="space-y-3">
+                                  {data.lastAwsFetch.sampleGroups.map((group: any, idx: number) => (
+                                    <div key={idx} className="bg-white rounded p-3 border border-green-200">
+                                      <div className="flex justify-between items-center mb-2">
+                                        <span className="text-sm font-medium text-green-900">{group.service || 'Unknown'}</span>
+                                      </div>
+                                      <div className="flex justify-between text-xs">
+                                        <span className="text-green-600">Amount:</span>
+                                        <span className="font-mono font-bold text-green-900">{group.amount}</span>
+                                      </div>
+                                      <div className="flex justify-between text-xs">
+                                        <span className="text-green-600">Unit:</span>
+                                        <span className="font-mono text-green-900">{group.unit || 'USD'}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Computed Total */}
+                            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                              <h4 className="text-sm font-semibold text-purple-900 mb-3">Computed Total (by PULSE)</h4>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-purple-600">Total from AWS:</span>
+                                  <span className="font-mono font-bold text-purple-900">
+                                    {data.lastAwsFetch.computedTotalFromAws?.toFixed(2) || data.lastAwsFetch.totalFromAws?.toFixed(2) || '0.00'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-purple-600">Currency:</span>
+                                  <span className="font-mono text-purple-900">{data.lastAwsFetch.currencyFromAws || 'USD'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-purple-600">Record Count:</span>
+                                  <span className="font-mono text-purple-900">{data.lastAwsFetch.recordCount || 0}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Comparison */}
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                              <h4 className="text-sm font-semibold text-yellow-900 mb-3">Comparison</h4>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-yellow-600">AWS First Result Total:</span>
+                                  <span className="font-mono text-yellow-900">
+                                    {data.lastAwsFetch.firstResultTotalAmount || 'N/A'} {data.lastAwsFetch.firstResultTotalUnit || ''}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-yellow-600">PULSE Computed Total:</span>
+                                  <span className="font-mono text-yellow-900">
+                                    {data.lastAwsFetch.computedTotalFromAws?.toFixed(2) || data.lastAwsFetch.totalFromAws?.toFixed(2) || '0.00'} {data.lastAwsFetch.currencyFromAws || 'USD'}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-yellow-600">DB Sum (30d):</span>
+                                  <span className="font-mono text-yellow-900">
+                                    {data.sum_30d?.toFixed(2) || '0.00'} EUR
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                            <p className="text-sm text-gray-500">
+                              No AWS fetch data available. Enable AWS_SYNC_DEBUG=true and run a sync to see raw AWS data.
+                            </p>
+                          </div>
+                        )}
                       </div>
-                      <pre className="bg-gray-50 border border-gray-200 rounded-md p-4 text-xs overflow-x-auto max-h-96">
-                        {JSON.stringify(data, null, 2)}
-                      </pre>
-                    </div>
+                    )}
                   </div>
                 )}
 

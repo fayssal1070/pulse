@@ -87,6 +87,21 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Enrich lastAwsFetch with debug fields if AWS_SYNC_DEBUG is enabled
+    const isDebug = process.env.AWS_SYNC_DEBUG === '1' || process.env.AWS_SYNC_DEBUG === 'true'
+    const enrichedLastAwsFetch = lastAwsFetch && isDebug ? {
+      ...lastAwsFetch,
+      // Ensure all debug fields are included
+      start: lastAwsFetch.timePeriod?.start,
+      end: lastAwsFetch.timePeriod?.end,
+      metric: lastAwsFetch.metric,
+      granularity: lastAwsFetch.granularity || 'DAILY',
+      firstResultTotalAmount: lastAwsFetch.firstResultTotal?.amount,
+      firstResultTotalUnit: lastAwsFetch.firstResultTotal?.unit,
+      sampleGroups: lastAwsFetch.sampleGroups || [],
+      computedTotalFromAws: lastAwsFetch.computedTotalFromAws || lastAwsFetch.totalFromAws,
+    } : lastAwsFetch
+
     return NextResponse.json({
       orgId,
       count,
@@ -98,7 +113,7 @@ export async function GET(request: NextRequest) {
         id: awsAccount.id,
         lastSyncedAt: awsAccount.lastSyncedAt?.toISOString() || null,
       } : null,
-      lastAwsFetch,
+      lastAwsFetch: enrichedLastAwsFetch,
       deployment: {
         env: process.env.VERCEL_ENV || 'development',
         commitSha: process.env.VERCEL_GIT_COMMIT_SHA || 'local',

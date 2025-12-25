@@ -24,9 +24,22 @@ export interface AWSSyncResult {
 export interface AWSFetchMetadata {
   timePeriod: { start: string; end: string }
   metric: string
+  granularity?: string
   totalFromAws: number
   currencyFromAws: string
   recordCount: number
+  fetchedAt?: string
+  // Debug fields (only when AWS_SYNC_DEBUG=true)
+  firstResultTotal?: {
+    amount: string
+    unit: string
+  }
+  sampleGroups?: Array<{
+    service: string
+    amount: string
+    unit: string
+  }>
+  computedTotalFromAws?: number
 }
 
 /**
@@ -128,6 +141,7 @@ export async function fetchDailyCosts(
   let firstResultLogged = false
   let hasAnyResults = false
   let sampleServices: Array<{ service: string; amount: string; unit: string }> = []
+  let firstResultTotal: { amount: string; unit: string } | undefined = undefined
 
   do {
     const command = new GetCostAndUsageCommand({
@@ -265,30 +279,28 @@ export async function fetchDailyCosts(
   }
 
   // Return fetch metadata for debug endpoint
-  return {
-    costData,
-    fetchMetadata: {
-      timePeriod: { start: startDateStr, end: endDateStr },
-      metric,
-      totalFromAws: finalTotalAmount,
-      currencyFromAws: costData.length > 0 ? costData[0].currency : 'USD',
-      recordCount: costData.length,
-    },
+  const fetchMetadata: AWSFetchMetadata = {
+    timePeriod: { start: startDateStr, end: endDateStr },
+    metric,
+    granularity: 'DAILY',
+    totalFromAws: finalTotalAmount,
+    currencyFromAws: costData.length > 0 ? costData[0].currency : 'USD',
+    recordCount: costData.length,
+    fetchedAt: new Date().toISOString(),
   }
 
-  // If we got ResultsByTime but no cost data, it means no costs (not a pending state)
-  // If we got no ResultsByTime at all, it might indicate Cost Explorer is not ready
-  // But we can't distinguish here, so we return empty array and let the caller check
+  // Enrich with debug fields if AWS_SYNC_DEBUG is enabled
+  if (isDebug) {
+    if (firstResultTotal) {
+      fetchMetadata.firstResultTotal = firstResultTotal
+    }
+    fetchMetadata.sampleGroups = sampleServices.slice(0, 3)
+    fetchMetadata.computedTotalFromAws = finalTotalAmount
+  }
 
   return {
     costData,
-    fetchMetadata: {
-      timePeriod: { start: startDateStr, end: endDateStr },
-      metric,
-      totalFromAws: finalTotalAmount,
-      currencyFromAws: costData.length > 0 ? costData[0].currency : 'USD',
-      recordCount: costData.length,
-    },
+    fetchMetadata,
   }
 }
 
