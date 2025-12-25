@@ -8,8 +8,8 @@ import { prisma } from '@/lib/prisma'
  * Returns: orgId, count, min/max date, sum_30d (amountEUR)
  * No secrets exposed
  * 
- * NOTE: Routes with underscore may be ignored by some Next.js/Vercel configurations.
- * Use /api/debug/costs instead for better compatibility.
+ * Alternative route without underscore for better Vercel compatibility
+ * Original route: /api/_debug/costs
  */
 export async function GET(request: NextRequest) {
   try {
