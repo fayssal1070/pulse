@@ -98,7 +98,9 @@ export async function fetchDailyCosts(
     ],
   }
 
+  const isDebug = process.env.AWS_SYNC_DEBUG === '1'
   let nextToken: string | undefined
+  let firstResultLogged = false
 
   do {
     const command = new GetCostAndUsageCommand({
@@ -109,8 +111,40 @@ export async function fetchDailyCosts(
     const response = await costExplorerClient.send(command)
 
     if (!response.ResultsByTime) {
+      if (isDebug) {
+        console.log('[AWS_SYNC_DEBUG] No ResultsByTime in response')
+      }
       break
     }
+
+    // Debug: Log first result structure
+    if (isDebug && !firstResultLogged && response.ResultsByTime.length > 0) {
+      const firstResult = response.ResultsByTime[0]
+      console.log('[AWS_SYNC_DEBUG]', JSON.stringify({
+        metric: 'UnblendedCost',
+        firstResultTimePeriod: firstResult.TimePeriod,
+        firstResultTotal: firstResult.Total ? {
+          UnblendedCost: {
+            Amount: firstResult.Total.UnblendedCost?.Amount,
+            Unit: firstResult.Total.UnblendedCost?.Unit,
+          },
+        } : null,
+        firstGroup: firstResult.Groups && firstResult.Groups.length > 0 ? {
+          Keys: firstResult.Groups[0].Keys,
+          Metrics: firstResult.Groups[0].Metrics ? {
+            UnblendedCost: {
+              Amount: firstResult.Groups[0].Metrics.UnblendedCost?.Amount,
+              Unit: firstResult.Groups[0].Metrics.UnblendedCost?.Unit,
+            },
+          } : null,
+        } : null,
+        totalResultsByTime: response.ResultsByTime.length,
+      }))
+      firstResultLogged = true
+    }
+
+    let recordsWithAmountGreaterThanZero = 0
+    let totalRawAmount = 0
 
     for (const result of response.ResultsByTime) {
       const date = result.TimePeriod?.Start
@@ -120,22 +154,56 @@ export async function fetchDailyCosts(
 
       for (const group of result.Groups) {
         const service = group.Keys?.[0] || 'Unknown'
-        const amount = parseFloat(group.Metrics?.UnblendedCost?.Amount || '0')
-        const currency = group.Metrics?.UnblendedCost?.Unit || 'USD'
+        const rawAmountString = group.Metrics?.UnblendedCost?.Amount || '0'
+        const rawUnit = group.Metrics?.UnblendedCost?.Unit || 'USD'
+        const amount = parseFloat(rawAmountString)
+
+        // Debug: Log raw values
+        if (isDebug) {
+          console.log('[AWS_SYNC_DEBUG]', JSON.stringify({
+            date,
+            service,
+            rawAmountString,
+            rawUnit,
+            parsedAmount: amount,
+            amountGreaterThanZero: amount > 0,
+          }))
+        }
 
         if (amount > 0) {
+          recordsWithAmountGreaterThanZero++
+          totalRawAmount += amount
           costData.push({
             date,
             service,
             amount,
-            currency,
+            currency: rawUnit,
           })
         }
       }
     }
 
+    // Debug: Log summary for this page
+    if (isDebug) {
+      console.log('[AWS_SYNC_DEBUG]', JSON.stringify({
+        page: nextToken ? 'next' : 'first',
+        recordsWithAmountGreaterThanZero,
+        totalRawAmount,
+        totalCostDataSoFar: costData.length,
+      }))
+    }
+
     nextToken = response.NextPageToken
   } while (nextToken)
+
+  // Debug: Log final summary
+  if (isDebug) {
+    console.log('[AWS_SYNC_DEBUG]', JSON.stringify({
+      finalTotalRecords: costData.length,
+      finalTotalAmount: costData.reduce((sum, r) => sum + r.amount, 0),
+      services: [...new Set(costData.map(r => r.service))],
+    }))
+  }
 
   return costData
 }

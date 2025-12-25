@@ -190,14 +190,44 @@ export async function syncCloudAccountCosts(
     }
   }
 
+  // Debug: Log before DB insert
+  const isDebug = process.env.AWS_SYNC_DEBUG === '1'
+  let recordsWithAmountGreaterThanZero = 0
+  let totalAmountBeforeInsert = 0
+
+  for (const [key, data] of dailyTotals) {
+    if (data.amount > 0) {
+      recordsWithAmountGreaterThanZero++
+      totalAmountBeforeInsert += data.amount
+    }
+  }
+
+  if (isDebug) {
+    console.log('[AWS_SYNC_DEBUG]', JSON.stringify({
+      stage: 'before_db_insert',
+      dailyTotalsSize: dailyTotals.size,
+      recordsWithAmountGreaterThanZero,
+      totalAmountBeforeInsert,
+      sampleRecords: Array.from(dailyTotals.entries()).slice(0, 3).map(([key, data]) => ({
+        key,
+        service: data.service,
+        amount: data.amount,
+        currency: data.currency,
+        amountEUR: data.currency === 'EUR' ? data.amount : data.amount * 0.92,
+      })),
+    }))
+  }
+
   // Upsert cost records
   let upsertedCount = 0
+  let totalAmountEURInserted = 0
   for (const [key, data] of dailyTotals) {
     const [dateStr] = key.split(':')
     const date = new Date(dateStr + 'T00:00:00Z')
 
     // Convert to EUR if needed
     const amountEUR = data.currency === 'EUR' ? data.amount : data.amount * 0.92
+    const roundedAmountEUR = Math.round(amountEUR * 100) / 100
 
     // Use upsert to avoid duplicates (based on orgId + date + provider + service)
     // Since we don't have a unique constraint, we'll delete and recreate for simplicity
@@ -219,12 +249,22 @@ export async function syncCloudAccountCosts(
         date,
         provider: 'AWS',
         service: data.service,
-        amountEUR: Math.round(amountEUR * 100) / 100,
+        amountEUR: roundedAmountEUR,
         currency: data.currency,
       },
     })
 
+    totalAmountEURInserted += roundedAmountEUR
     upsertedCount++
+  }
+
+  // Debug: Log after DB insert
+  if (isDebug) {
+    console.log('[AWS_SYNC_DEBUG]', JSON.stringify({
+      stage: 'after_db_insert',
+      upsertedCount,
+      totalAmountEURInserted,
+    }))
   }
 
     // Update cloud account status
