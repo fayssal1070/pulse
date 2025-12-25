@@ -15,10 +15,12 @@ export interface SyncPipelineResult {
 /**
  * Sync costs for a single AWS CloudAccount
  * Includes lock to prevent parallel syncs for the same account
+ * @param cloudAccountId - The ID of the cloud account to sync
+ * @param force - If true, bypasses the 6-hour minimum interval check (for manual syncs). Default: false (for cron)
  */
 export async function syncCloudAccountCosts(
   cloudAccountId: string,
-  skipTimeCheck: boolean = false // Admin override to skip 6h check
+  force: boolean = false // If true, bypass 6h check (for manual "Sync Now")
 ): Promise<SyncPipelineResult> {
   // Acquire account-specific lock
   const accountLockId = `aws-sync-${cloudAccountId}`
@@ -106,8 +108,9 @@ export async function syncCloudAccountCosts(
     }
   }
 
-  // Check if synced recently (unless admin override)
-  if (!skipTimeCheck && cloudAccount.lastSyncedAt) {
+  // Check if synced recently (unless force=true for manual sync)
+  // The lock DB above prevents parallel syncs, but this check prevents unnecessary syncs for cron
+  if (!force && cloudAccount.lastSyncedAt) {
     const sixHoursAgo = new Date(now.getTime() - 6 * 60 * 60 * 1000)
     if (cloudAccount.lastSyncedAt > sixHoursAgo) {
       await prisma.jobLock.update({

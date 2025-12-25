@@ -65,9 +65,10 @@ export async function GET(request: NextRequest) {
     }> = []
 
     // Sync each account (with error handling to prevent one failure from stopping others)
+    // Use force=false (default) to respect the 6-hour minimum interval for cron
     for (const account of cloudAccounts) {
       try {
-        const result = await syncCloudAccountCosts(account.id)
+        const result = await syncCloudAccountCosts(account.id, false)
         results.push({
           cloudAccountId: account.id,
           orgId: account.orgId,

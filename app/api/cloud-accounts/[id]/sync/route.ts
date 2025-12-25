@@ -4,10 +4,6 @@ import { getActiveOrganizationId } from '@/lib/active-org'
 import { prisma } from '@/lib/prisma'
 import { syncCloudAccountCosts } from '@/lib/aws-sync-pipeline'
 
-// Rate limiting: store last sync time per org
-const lastSyncTimes = new Map<string, number>()
-const RATE_LIMIT_MS = 15 * 60 * 1000 // 15 minutes
-
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -51,19 +47,6 @@ export async function POST(
       )
     }
 
-    // Check rate limit
-    const lastSync = lastSyncTimes.get(orgId)
-    const now = Date.now()
-    if (lastSync && now - lastSync < RATE_LIMIT_MS) {
-      const remainingSeconds = Math.ceil((RATE_LIMIT_MS - (now - lastSync)) / 1000)
-      return NextResponse.json(
-        {
-          error: `Rate limit exceeded. Please wait ${remainingSeconds} seconds before syncing again.`,
-        },
-        { status: 429 }
-      )
-    }
-
     // Only allow sync for AWS Cost Explorer accounts
     if (cloudAccount.provider !== 'AWS' || cloudAccount.connectionType !== 'COST_EXPLORER') {
       return NextResponse.json(
@@ -72,11 +55,9 @@ export async function POST(
       )
     }
 
-    // Perform sync
-    const result = await syncCloudAccountCosts(id)
-
-    // Update rate limit
-    lastSyncTimes.set(orgId, now)
+    // Perform sync with force=true to allow manual sync even if recently synced
+    // The lock DB will still prevent parallel syncs on the same account
+    const result = await syncCloudAccountCosts(id, true)
 
     if (!result.success) {
       return NextResponse.json(
