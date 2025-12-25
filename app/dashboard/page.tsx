@@ -18,6 +18,8 @@ import DebugCostsButton from '@/components/debug-costs-button'
 import AdminDeploymentInfo from '@/components/admin-deployment-info'
 import LastSyncedDate from '@/components/last-synced-date'
 import FormattedDate from '@/components/formatted-date'
+import ErrorBoundary from '@/components/error-boundary'
+import HydrationErrorDetector from '@/components/hydration-error-detector'
 import { isAdmin } from '@/lib/admin-helpers'
 
 export default async function DashboardPage({
@@ -160,8 +162,10 @@ export default async function DashboardPage({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {showAdminError && (
+    <ErrorBoundary>
+      <HydrationErrorDetector />
+      <div className="min-h-screen bg-gray-50">
+        {showAdminError && (
         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex">
@@ -482,6 +486,7 @@ export default async function DashboardPage({
         vercelEnv={process.env.VERCEL_ENV || 'development'}
         commitSha={process.env.VERCEL_GIT_COMMIT_SHA || 'local'}
       />
-    </div>
+      </div>
+    </ErrorBoundary>
   )
 }
