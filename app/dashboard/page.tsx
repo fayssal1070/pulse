@@ -105,16 +105,12 @@ export default async function DashboardPage({
     }
   }
 
-  // Check for banner states: Data Pending vs No Costs
-  // Use /api/debug/costs data (server-side) for precise decisions
-  let showDataPendingBanner = false
-  let showNoCostsBanner = false
-  let showNoDataBanner = false
+  // Check for banner states: 3 clear states (HAS_DATA, NO_SPEND_YET, DATA_PENDING)
+  let bannerState: 'HAS_DATA' | 'NO_SPEND_YET' | 'DATA_PENDING' | null = null
   let bannerMessage = ''
-  let bannerAction: React.ReactNode = null
 
   if (hasActiveAWS && activeOrgId) {
-    // Get AWS account to find its ID for sync button
+    // Get AWS account with all needed info
     const awsAccount = await prisma.cloudAccount.findFirst({
       where: {
         orgId: activeOrgId,
@@ -125,23 +121,7 @@ export default async function DashboardPage({
       select: {
         id: true,
         lastSyncedAt: true,
-      },
-      orderBy: {
-        lastSyncedAt: 'desc',
-      },
-    })
-
-    // Get debug costs data (server-side call)
-    // We'll replicate the logic from /api/debug/costs here to avoid circular dependency
-    const awsAccountWithNotes = await prisma.cloudAccount.findFirst({
-      where: {
-        orgId: activeOrgId,
-        provider: 'AWS',
-        connectionType: 'COST_EXPLORER',
-        status: 'active',
-      },
-      select: {
-        id: true,
+        lastSyncError: true,
         notes: true,
       },
       orderBy: {
@@ -157,9 +137,9 @@ export default async function DashboardPage({
       currencyFromAws: string
     } | null = null
 
-    if (awsAccountWithNotes?.notes) {
+    if (awsAccount?.notes) {
       try {
-        const notes = JSON.parse(awsAccountWithNotes.notes)
+        const notes = JSON.parse(awsAccount.notes)
         if (notes.lastAwsFetch) {
           lastAwsFetch = notes.lastAwsFetch
         }
@@ -168,93 +148,52 @@ export default async function DashboardPage({
       }
     }
 
-    // Get sum_30d and count_30d from CostRecord
+    // Get sum_30d from CostRecord
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
     thirtyDaysAgo.setHours(0, 0, 0, 0)
 
-    const [sum30d, count30d] = await Promise.all([
-      prisma.costRecord.aggregate({
-        where: {
-          orgId: activeOrgId,
-          date: { gte: thirtyDaysAgo },
-        },
-        _sum: {
-          amountEUR: true,
-        },
-      }),
-      prisma.costRecord.count({
-        where: {
-          orgId: activeOrgId,
-          date: { gte: thirtyDaysAgo },
-        },
-      }),
-    ])
+    const sum30d = await prisma.costRecord.aggregate({
+      where: {
+        orgId: activeOrgId,
+        date: { gte: thirtyDaysAgo },
+      },
+      _sum: {
+        amountEUR: true,
+      },
+    })
 
     const sum_30d = sum30d._sum.amountEUR || 0
-    const count_30d = count30d
 
-    // Decision logic based on lastAwsFetch metadata
-    if (lastAwsFetch) {
-      const fetchedAt = new Date(lastAwsFetch.fetchedAt)
-      const now = new Date()
-      const hoursSinceFetch = (now.getTime() - fetchedAt.getTime()) / (1000 * 60 * 60)
-      const isRecentFetch = hoursSinceFetch < 24
-
-      // Case 1: Data Pending (first activation)
-      // fetchedAt exists, recordCount > 0, totalFromAws = 0, fetchedAt < 24h
-      if (
-        lastAwsFetch.recordCount > 0 &&
-        lastAwsFetch.totalFromAws === 0 &&
-        isRecentFetch
-      ) {
-        showDataPendingBanner = true
-        bannerMessage = 'AWS Cost Explorer prépare les données (première activation). Cela peut prendre jusqu\'à 24h.'
-      }
-      // Case 2: No billable costs (fetchedAt > 24h)
-      // recordCount > 0, totalFromAws = 0, fetchedAt > 24h
-      else if (
-        lastAwsFetch.recordCount > 0 &&
-        lastAwsFetch.totalFromAws === 0 &&
-        !isRecentFetch
-      ) {
-        showNoCostsBanner = true
-        bannerMessage = 'No billable costs returned by AWS for selected period.'
-      }
-      // Case 3: No data fetched yet
-      // recordCount = 0
-      else if (lastAwsFetch.recordCount === 0) {
-        showNoDataBanner = true
-        bannerMessage = 'No data fetched yet.'
-        if (awsAccount?.id) {
-          bannerAction = (
-            <Link
-              href={`/organizations/${activeOrgId}/cloud-accounts`}
-              className="ml-2 text-sm font-medium text-blue-600 hover:text-blue-700 underline"
-            >
-              Sync Now →
-            </Link>
-          )
-        }
-      }
-      // Case 4: Normal case (totalFromAws > 0)
+    // Decision logic: 3 clear states
+    // HAS_DATA: sum_30d > 0 → no banner
+    if (sum_30d > 0) {
+      bannerState = 'HAS_DATA'
       // No banner needed
-    } else if (awsAccount?.lastSyncedAt) {
-      // Fallback: if lastSyncedAt exists but no lastAwsFetch metadata
-      // Check if we have any cost records
-      if (count_30d === 0) {
-        showNoDataBanner = true
-        bannerMessage = 'No data fetched yet.'
-        if (awsAccount.id) {
-          bannerAction = (
-            <Link
-              href={`/organizations/${activeOrgId}/cloud-accounts`}
-              className="ml-2 text-sm font-medium text-blue-600 hover:text-blue-700 underline"
-            >
-              Sync Now →
-            </Link>
-          )
-        }
+    }
+    // NO_SPEND_YET: AWS actif + lastSyncedAt existe + lastAwsFetch.totalFromAws ≈ 0 (<= 0.01)
+    else if (
+      awsAccount?.lastSyncedAt &&
+      lastAwsFetch &&
+      lastAwsFetch.totalFromAws !== null &&
+      lastAwsFetch.totalFromAws !== undefined &&
+      lastAwsFetch.totalFromAws <= 0.01
+    ) {
+      bannerState = 'NO_SPEND_YET'
+      bannerMessage = 'No spend yet — Aucune dépense AWS détectée pour l\'instant. Dès que vous utilisez un service (EC2, S3…), les coûts apparaîtront ici.'
+    }
+    // DATA_PENDING: AWS actif + lastSyncedAt existe + (lastAwsFetch absent/null) OU erreur AWS typique
+    else if (awsAccount?.lastSyncedAt) {
+      const hasAwsError = awsAccount.lastSyncError && (
+        awsAccount.lastSyncError.includes('Cost Explorer not enabled') ||
+        awsAccount.lastSyncError.includes('not ready') ||
+        awsAccount.lastSyncError.includes('AWS_COST_EXPLORER_NOT_READY') ||
+        awsAccount.lastSyncError.includes('AWS_COST_EXPLORER_NOT_ENABLED')
+      )
+
+      if (!lastAwsFetch || hasAwsError) {
+        bannerState = 'DATA_PENDING'
+        bannerMessage = 'AWS Cost Explorer peut prendre jusqu\'à 24h pour préparer les données lors de la première activation.'
       }
     }
   }
@@ -344,8 +283,26 @@ export default async function DashboardPage({
             <DemoBanner organizationId={activeOrgId} />
           )}
 
-          {/* Data Pending Banner (Cost Explorer not ready) */}
-          {showDataPendingBanner && (
+          {/* NO_SPEND_YET Banner (AWS active but no spend detected) */}
+          {bannerState === 'NO_SPEND_YET' && (
+            <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-blue-700">
+                    <span className="font-medium">No spend yet</span> — {bannerMessage}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DATA_PENDING Banner (Cost Explorer not ready) */}
+          {bannerState === 'DATA_PENDING' && (
             <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
               <div className="flex">
                 <div className="flex-shrink-0">
@@ -355,49 +312,12 @@ export default async function DashboardPage({
                 </div>
                 <div className="ml-3">
                   <p className="text-sm text-yellow-700">
-                    <span className="font-medium">Data Pending</span> - {bannerMessage}
+                    <span className="font-medium">Data Pending</span> — {bannerMessage}
                   </p>
                 </div>
               </div>
             </div>
           )}
-
-                   {/* No Costs Banner (AWS synced but no billable costs) */}
-                   {showNoCostsBanner && (
-                     <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
-                       <div className="flex">
-                         <div className="flex-shrink-0">
-                           <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                           </svg>
-                         </div>
-                         <div className="ml-3">
-                           <p className="text-sm text-blue-700">
-                             <span className="font-medium">Info</span> - {bannerMessage}
-                           </p>
-                         </div>
-                       </div>
-                     </div>
-                   )}
-
-                   {/* No Data Banner (no data fetched yet) */}
-                   {showNoDataBanner && (
-                     <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-                       <div className="flex items-center">
-                         <div className="flex-shrink-0">
-                           <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                           </svg>
-                         </div>
-                         <div className="ml-3 flex-1">
-                           <p className="text-sm text-yellow-700">
-                             <span className="font-medium">No Data</span> - {bannerMessage}
-                             {bannerAction}
-                           </p>
-                         </div>
-                       </div>
-                     </div>
-                   )}
 
           {/* Setup Progress Widget */}
           {activeOrgId && onboardingStatus && !onboardingStatus.completed && (

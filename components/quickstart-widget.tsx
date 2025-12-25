@@ -152,7 +152,7 @@ export default function QuickstartWidget({
           <span className="font-medium">Manual:</span> Sync Now anytime
         </p>
         <p className="text-gray-500 italic">
-          Note: AWS updates ~24h
+          Note: AWS updates ~24h. Si vous n'avez encore aucune dépense AWS, les montants resteront à 0.
         </p>
         {lastSyncedFormatted && (
           <p className="text-gray-500 mt-1">

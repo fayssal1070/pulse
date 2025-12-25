@@ -136,7 +136,7 @@ export default async function CloudAccountsPage({
                               <span className="text-blue-600">Sync Now anytime</span>
                             </p>
                             <p className="text-xs text-gray-500 mt-1">
-                              Note: AWS updates ~24h
+                              Note: AWS updates ~24h. Si vous n'avez encore aucune dépense AWS, les montants resteront à 0.
                             </p>
                           </div>
                         )}
