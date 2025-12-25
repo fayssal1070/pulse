@@ -144,7 +144,9 @@ export default async function CloudAccountRecordsPage({
                           {record.service}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
-                          {record.amountEUR.toFixed(2)}
+                          {record.currency === 'EUR' 
+                            ? `${record.amountEUR.toFixed(2)} EUR`
+                            : `${(record.amountEUR / 0.92).toFixed(2)} ${record.currency} (${record.amountEUR.toFixed(2)} EUR)`}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {record.currency}
@@ -158,7 +160,18 @@ export default async function CloudAccountRecordsPage({
                         Total ({costRecords.length} records)
                       </td>
                       <td className="px-6 py-3 text-sm font-bold text-gray-900 text-right">
-                        {costRecords.reduce((sum, r) => sum + r.amountEUR, 0).toFixed(2)} EUR
+                        {(() => {
+                          const totalEUR = costRecords.reduce((sum, r) => sum + r.amountEUR, 0)
+                          const currencies = [...new Set(costRecords.map(r => r.currency))]
+                          if (currencies.length === 1 && currencies[0] === 'EUR') {
+                            return `${totalEUR.toFixed(2)} EUR`
+                          } else if (currencies.length === 1 && currencies[0] !== 'EUR') {
+                            const nativeAmount = totalEUR / 0.92
+                            return `${nativeAmount.toFixed(2)} ${currencies[0]} (${totalEUR.toFixed(2)} EUR)`
+                          } else {
+                            return `${totalEUR.toFixed(2)} EUR`
+                          }
+                        })()}
                       </td>
                       <td className="px-6 py-3"></td>
                     </tr>

@@ -65,10 +65,12 @@ export default async function DashboardPage({
   let cloudAccountsInfo = null
   let hasActiveAWS = false
   let awsAccountInfo = null
+  let accounts: Array<{ id: string; status: string; provider: string; connectionType: string | null; lastSyncedAt: Date | null }> = []
   if (activeOrgId) {
-    const accounts = await prisma.cloudAccount.findMany({
+    accounts = await prisma.cloudAccount.findMany({
       where: { orgId: activeOrgId },
       select: { 
+        id: true,
         status: true,
         provider: true,
         connectionType: true,
@@ -125,7 +127,7 @@ export default async function DashboardPage({
       if (lastSyncError.includes('[AWS_COST_EXPLORER_NOT_READY]') ||
           lastSyncError.includes('[AWS_COST_EXPLORER_NOT_ENABLED]')) {
         showDataPendingBanner = true
-        bannerMessage = 'AWS Cost Explorer peut prendre jusqu\'à 24h pour préparer les données lors de la première activation. Réessaie plus tard.'
+        bannerMessage = 'AWS Cost Explorer peut prendre jusqu\'à 24h pour préparer les données lors de la première activation.'
       } else if (lastSyncError.includes('[AWS_NO_COSTS]')) {
         showNoCostsBanner = true
         bannerMessage = 'Aucune dépense détectée sur la période.'
@@ -283,6 +285,45 @@ export default async function DashboardPage({
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-sm font-medium text-gray-500 mb-2">Last 30 days</h3>
               <p className="text-3xl font-bold text-gray-900">{total30Days.toFixed(2)} EUR</p>
+              {total30Days === 0 && hasActiveAWS && awsAccountInfo && (
+                <div className="mt-3 pt-3 border-t border-gray-200 space-y-1">
+                  <p className="text-xs text-gray-500">0.00 EUR sur 30 jours</p>
+                  {awsAccountInfo.lastSyncedAt && (
+                    <p className="text-xs text-gray-500">
+                      Dernière sync: {new Date(awsAccountInfo.lastSyncedAt).toLocaleString('fr-FR', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  )}
+                  {activeOrgId && (() => {
+                    // Find the AWS account ID to link to records
+                    const awsAccount = accounts?.find(
+                      a => a.provider === 'AWS' && 
+                           a.connectionType === 'COST_EXPLORER' && 
+                           a.status === 'active'
+                    )
+                    return awsAccount ? (
+                      <Link
+                        href={`/organizations/${activeOrgId}/cloud-accounts/${awsAccount.id}/records`}
+                        className="text-xs text-blue-600 hover:text-blue-700 font-medium inline-block"
+                      >
+                        Voir les enregistrements importés →
+                      </Link>
+                    ) : (
+                      <Link
+                        href={`/organizations/${activeOrgId}/cloud-accounts`}
+                        className="text-xs text-blue-600 hover:text-blue-700 font-medium inline-block"
+                      >
+                        Voir les enregistrements importés →
+                      </Link>
+                    )
+                  })()}
+                </div>
+              )}
             </div>
             {cloudAccountsInfo && (
               <div className="bg-white rounded-lg shadow p-6">
