@@ -15,6 +15,7 @@ import SetupProgressWidget from '@/components/setup-progress-widget'
 import SetupCompleteBanner from '@/components/setup-complete-banner'
 import QuickstartWidget from '@/components/quickstart-widget'
 import DebugCostsButton from '@/components/debug-costs-button'
+import AdminDeploymentInfo from '@/components/admin-deployment-info'
 import { isAdmin } from '@/lib/admin-helpers'
 
 export default async function DashboardPage({
@@ -477,6 +478,11 @@ export default async function DashboardPage({
           </div>
         </div>
       </main>
+      <AdminDeploymentInfo 
+        isAdmin={isAdminUser}
+        vercelEnv={process.env.VERCEL_ENV || 'development'}
+        commitSha={process.env.VERCEL_GIT_COMMIT_SHA || 'local'}
+      />
     </div>
   )
 }

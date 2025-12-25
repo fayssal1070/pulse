@@ -84,6 +84,11 @@ export async function GET(request: NextRequest) {
         id: awsAccount.id,
         lastSyncedAt: awsAccount.lastSyncedAt?.toISOString() || null,
       } : null,
+      deployment: {
+        env: process.env.VERCEL_ENV || 'development',
+        commitSha: process.env.VERCEL_GIT_COMMIT_SHA || 'local',
+        commitShaShort: (process.env.VERCEL_GIT_COMMIT_SHA || 'local').substring(0, 7),
+      },
     })
   } catch (error) {
     console.error('Debug costs error:', error)
