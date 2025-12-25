@@ -181,6 +181,12 @@ export default async function CloudAccountsPage({
                       {account.connectionType === 'COST_EXPLORER' && account.provider === 'AWS' && (
                         <CloudAccountSyncButton cloudAccountId={account.id} />
                       )}
+                      <Link
+                        href={`/organizations/${id}/cloud-accounts/${account.id}/records`}
+                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                      >
+                        View Imported Records →
+                      </Link>
                     </div>
                   </div>
                 </div>
