@@ -32,6 +32,9 @@ export async function GET(request: NextRequest) {
     // In production, this will be the deployment time
     const buildTimestamp = process.env.VERCEL ? new Date().toISOString() : new Date().toISOString()
     
+    // App version
+    const appVersion = process.env.APP_VERSION || '1.0.0'
+    
     // Additional info
     const vercelUrl = process.env.VERCEL_URL || null
     const vercel = process.env.VERCEL === '1'
@@ -41,12 +44,14 @@ export async function GET(request: NextRequest) {
       commitShaShort,
       env,
       buildTimestamp,
+      appVersion,
       vercel,
       vercelUrl,
       deployment: {
         commit: commitShaShort,
         environment: env,
         timestamp: buildTimestamp,
+        version: appVersion,
       },
     })
   } catch (error) {

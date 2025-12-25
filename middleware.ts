@@ -16,7 +16,8 @@ export default async function middleware(request: NextRequest) {
   const isPublicRoute = publicRoutes.includes(pathname) ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/invitations/') ||
-    pathname.startsWith('/api/leads')
+    pathname.startsWith('/api/leads') ||
+    pathname.startsWith('/help/') // Help pages (protected by auth in page itself)
 
   if (isPublicRoute) {
     return NextResponse.next()

@@ -142,12 +142,32 @@ export default function BuildInfoButton() {
                     {/* Build timestamp */}
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                       <p className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">
-                        Build Timestamp
+                        Build Time
                       </p>
                       <p className="text-sm text-gray-900">
-                        {new Date(data.buildTimestamp).toLocaleString()}
+                        {new Date(data.buildTimestamp).toLocaleString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                          timeZoneName: 'short',
+                        })}
                       </p>
                     </div>
+
+                    {/* App Version */}
+                    {data.appVersion && (
+                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        <p className="text-xs font-medium text-purple-600 uppercase tracking-wide mb-1">
+                          App Version
+                        </p>
+                        <p className="text-2xl font-bold text-purple-900">
+                          {data.appVersion}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Full JSON */}
                     <div>
