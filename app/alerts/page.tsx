@@ -89,16 +89,19 @@ export default async function AlertsPage() {
                         Organization
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Name
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Threshold (EUR)
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Window (days)
+                        Type
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Triggered At
+                        Last Triggered
                       </th>
                     </tr>
                   </thead>
@@ -106,31 +109,36 @@ export default async function AlertsPage() {
                     {alertRules.map((rule) => (
                       <tr
                         key={rule.id}
-                        className={rule.triggered ? 'bg-red-50' : 'hover:bg-gray-50'}
+                        className={rule.lastTriggeredAt ? 'bg-red-50' : 'hover:bg-gray-50'}
                       >
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                           {rule.organization.name}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          {rule.name}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                           {rule.thresholdEUR.toFixed(2)}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                          {rule.windowDays}
+                          {rule.type === 'MONTHLY_BUDGET' ? 'Monthly Budget' : 'Daily Spike'}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span
                             className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                              rule.triggered
+                              rule.lastTriggeredAt
                                 ? 'bg-red-100 text-red-800'
-                                : 'bg-green-100 text-green-800'
+                                : rule.enabled
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
                             }`}
                           >
-                            {rule.triggered ? 'Triggered' : 'Active'}
+                            {rule.lastTriggeredAt ? 'Triggered' : rule.enabled ? 'Active' : 'Disabled'}
                           </span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                          {rule.triggeredAt
-                            ? new Date(rule.triggeredAt).toLocaleString('en-US', {
+                          {rule.lastTriggeredAt
+                            ? new Date(rule.lastTriggeredAt).toLocaleString('en-US', {
                                 year: 'numeric',
                                 month: 'short',
                                 day: 'numeric',

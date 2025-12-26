@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/sync-aws-costs",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/evaluate-alerts",
+      "schedule": "0 */6 * * *"
     }
   ]
 }

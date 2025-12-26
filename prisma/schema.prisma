@@ -59,16 +59,56 @@ model CostRecord {
 }
 
 model AlertRule {
-  id           String       @id @default(cuid())
-  orgId        String
-  thresholdEUR Float
-  windowDays   Int          @default(7)
-  triggered    Boolean      @default(false)
-  triggeredAt  DateTime?
-  createdAt    DateTime     @default(now())
-  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  id              String       @id @default(cuid())
+  orgId           String
+  name            String
+  type            String // "MONTHLY_BUDGET" | "DAILY_SPIKE"
+  enabled         Boolean      @default(true)
+  thresholdEUR    Float
+  spikePercent    Float? // For DAILY_SPIKE (e.g., 50 for 50%)
+  lookbackDays    Int          @default(7) // For DAILY_SPIKE baseline
+  notifyEmail     Boolean      @default(false)
+  cooldownHours   Int          @default(24)
+  lastTriggeredAt DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  organization    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  alertEvents     AlertEvent[]
 
   @@index([orgId])
+  @@index([orgId, enabled])
+}
+
+model AlertEvent {
+  id          String    @id @default(cuid())
+  orgId       String
+  alertId     String
+  triggeredAt DateTime  @default(now())
+  periodStart DateTime
+  periodEnd   DateTime
+  amountEUR   Float
+  message     String
+  metadata    String? // JSON string for additional data
+  alertRule   AlertRule @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([alertId])
+  @@index([orgId, triggeredAt])
+}
+
+model InAppNotification {
+  id        String    @id @default(cuid())
+  orgId     String
+  userId    String? // null for org-wide notifications
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([orgId])
+  @@index([userId])
+  @@index([orgId, readAt])
+  @@index([orgId, createdAt])
 }
 
 model Invitation {
@@ -107,9 +147,9 @@ model CloudAccount {
   provider          String
   accountName       String
   accountIdentifier String?
-  connectionType    String?      // e.g., "COST_EXPLORER", "CSV", "MANUAL"
-  roleArn           String?      // AWS Role ARN for AssumeRole
-  externalId        String?      // AWS External ID for AssumeRole
+  connectionType    String? // e.g., "COST_EXPLORER", "CSV", "MANUAL"
+  roleArn           String? // AWS Role ARN for AssumeRole
+  externalId        String? // AWS External ID for AssumeRole
   status            String       @default("pending") // "pending", "active", "error", "disabled"
   lastSyncedAt      DateTime?
   lastSyncError     String?

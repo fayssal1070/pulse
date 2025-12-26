@@ -3,18 +3,31 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-export default function DeleteAlertButton({ alertId }: { alertId: string }) {
+interface DeleteAlertButtonProps {
+  alertId: string
+  organizationId: string
+}
+
+export default function DeleteAlertButton({
+  alertId,
+  organizationId,
+}: DeleteAlertButtonProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this alert?')) return
+    if (!confirm('Are you sure you want to delete this alert?')) {
+      return
+    }
 
     setLoading(true)
     try {
-      const res = await fetch(`/api/alerts/${alertId}`, {
-        method: 'DELETE',
-      })
+      const res = await fetch(
+        `/api/organizations/${organizationId}/alerts/${alertId}`,
+        {
+          method: 'DELETE',
+        }
+      )
 
       if (!res.ok) {
         alert('Failed to delete alert')
@@ -33,10 +46,9 @@ export default function DeleteAlertButton({ alertId }: { alertId: string }) {
     <button
       onClick={handleDelete}
       disabled={loading}
-      className="text-red-600 hover:text-red-800 text-sm disabled:opacity-50"
+      className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200 disabled:opacity-50"
     >
       {loading ? 'Deleting...' : 'Delete'}
     </button>
   )
 }
-

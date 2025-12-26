@@ -173,24 +173,30 @@ export default async function OrganizationPage({
                   <div
                     key={alert.id}
                     className={`p-3 rounded ${
-                      alert.triggered ? 'bg-red-50 border border-red-200' : 'bg-gray-50'
+                      alert.lastTriggeredAt ? 'bg-red-50 border border-red-200' : 'bg-gray-50'
                     }`}
                   >
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="font-medium text-gray-900">Alert Rule</p>
                         <p className="text-sm text-gray-500">
-                          Alert if total {alert.windowDays} days &gt; {alert.thresholdEUR} EUR
+                          {alert.type === 'MONTHLY_BUDGET'
+                            ? `Monthly budget: ${alert.thresholdEUR.toFixed(2)} EUR`
+                            : `Daily spike: ${alert.spikePercent ? `${alert.spikePercent}%` : ''} ${alert.thresholdEUR > 0 ? `or ${alert.thresholdEUR.toFixed(2)} EUR` : ''}`}
                         </p>
                       </div>
                       <div className="text-right">
-                        {alert.triggered ? (
+                        {alert.lastTriggeredAt ? (
                           <span className="bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded">
                             TRIGGERED
                           </span>
+                        ) : alert.enabled ? (
+                          <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded">
+                            ACTIVE
+                          </span>
                         ) : (
                           <span className="bg-gray-100 text-gray-800 text-xs font-semibold px-2 py-1 rounded">
-                            Active
+                            DISABLED
                           </span>
                         )}
                       </div>

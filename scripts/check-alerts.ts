@@ -41,14 +41,14 @@ function formatAlertMessage(
   orgName: string,
   thresholdEUR: number,
   totalEUR: number,
-  windowDays: number
+  lookbackDays: number
 ): string {
   return `🚨 <b>Alert Triggered</b>
 
 <b>Organization:</b> ${orgName}
 <b>Rule:</b> ${thresholdEUR.toFixed(2)} EUR threshold
 <b>Amount:</b> ${totalEUR.toFixed(2)} EUR
-<b>Period:</b> Last ${windowDays} days`
+<b>Period:</b> Last ${lookbackDays} days`
 }
 
 async function checkAlerts() {
@@ -63,9 +63,10 @@ async function checkAlerts() {
 
   for (const org of organizations) {
     for (const rule of org.alertRules) {
-      // Calculer le total des windowDays derniers jours
+      // Calculer le total des lookbackDays derniers jours (ou utiliser 7 par défaut pour compatibilité)
       const startDate = new Date()
-      startDate.setDate(startDate.getDate() - rule.windowDays)
+      const periodDays = rule.lookbackDays || 7
+      startDate.setDate(startDate.getDate() - periodDays)
       startDate.setHours(0, 0, 0, 0)
 
       const result = await prisma.costRecord.aggregate({
@@ -80,27 +81,30 @@ async function checkAlerts() {
 
       const total = result._sum.amountEUR || 0
 
-      // Si dépassement et pas déjà triggered (passage false->true)
-      if (total > rule.thresholdEUR && !rule.triggered) {
+      // Si dépassement et pas déjà triggered (cooldown check)
+      const shouldTrigger = total > rule.thresholdEUR && rule.enabled
+      const isInCooldown = rule.lastTriggeredAt && 
+        (new Date().getTime() - rule.lastTriggeredAt.getTime()) < (rule.cooldownHours * 60 * 60 * 1000)
+
+      if (shouldTrigger && !isInCooldown) {
         await prisma.alertRule.update({
           where: { id: rule.id },
           data: {
-            triggered: true,
-            triggeredAt: new Date(),
+            lastTriggeredAt: new Date(),
           },
         })
 
         console.log(
-          `✓ Alert rule triggered for "${org.name}": ${total.toFixed(2)} EUR > ${rule.thresholdEUR.toFixed(2)} EUR (${rule.windowDays} days)`
+          `✓ Alert rule triggered for "${org.name}": ${total.toFixed(2)} EUR > ${rule.thresholdEUR.toFixed(2)} EUR (${periodDays} days)`
         )
 
-        // Envoyer notification Telegram UNIQUEMENT lors du passage false->true
+        // Envoyer notification Telegram
         if (org.telegramBotToken && org.telegramChatId) {
           const message = formatAlertMessage(
             org.name,
             rule.thresholdEUR,
             total,
-            rule.windowDays
+            periodDays
           )
           const sent = await sendTelegramMessage(
             org.telegramBotToken,
@@ -115,13 +119,13 @@ async function checkAlerts() {
         } else {
           console.log(`  ℹ Telegram not configured for "${org.name}", skipping notification`)
         }
-      } else if (total > rule.thresholdEUR && rule.triggered) {
+      } else if (total > rule.thresholdEUR && isInCooldown) {
         console.log(
-          `  Alert rule already triggered for "${org.name}": ${total.toFixed(2)} EUR > ${rule.thresholdEUR.toFixed(2)} EUR`
+          `  Alert rule in cooldown for "${org.name}": ${total.toFixed(2)} EUR > ${rule.thresholdEUR.toFixed(2)} EUR`
         )
       } else {
         console.log(
-          `  Alert rule OK for "${org.name}": ${total.toFixed(2)} EUR <= ${rule.thresholdEUR.toFixed(2)} EUR (${rule.windowDays} days)`
+          `  Alert rule OK for "${org.name}": ${total.toFixed(2)} EUR <= ${rule.thresholdEUR.toFixed(2)} EUR (${periodDays} days)`
         )
       }
     }

@@ -61,7 +61,7 @@ export default function QuickstartWidget({
           completed: hasAlerts,
           action: organizationId ? (
             <Link
-              href={`/organizations/${organizationId}/alerts`}
+              href={`/organizations/${organizationId}/alerts/new`}
               className="text-xs text-blue-600 hover:text-blue-700 font-medium"
             >
               Create Alert →
@@ -120,7 +120,7 @@ export default function QuickstartWidget({
           completed: hasAlerts,
           action: organizationId ? (
             <Link
-              href={`/organizations/${organizationId}/alerts`}
+              href={`/organizations/${organizationId}/alerts/new`}
               className="text-xs text-blue-600 hover:text-blue-700 font-medium"
             >
               Create Alert →
