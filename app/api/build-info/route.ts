@@ -6,10 +6,19 @@ export async function GET() {
   const env = process.env.VERCEL_ENV || 'local'
   const buildTimestamp = new Date().toISOString()
   
-  return NextResponse.json({
-    commitShaShort: commitSha.substring(0, 7),
-    env: env,
-    buildTimestamp: buildTimestamp,
-  })
+  return NextResponse.json(
+    {
+      commitShaShort: commitSha.substring(0, 7),
+      env: env,
+      buildTimestamp: buildTimestamp,
+    },
+    {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'CDN-Cache-Control': 'no-store',
+        'Vercel-CDN-Cache-Control': 'no-store',
+      },
+    }
+  )
 }
 
