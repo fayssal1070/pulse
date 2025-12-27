@@ -282,6 +282,10 @@ export default async function DashboardPage({
             <div className="mb-6 flex justify-between items-start">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
+                {/* DEPLOY_PROOF: Preuve visuelle du commit déployé */}
+                <div className="mt-2 text-xs font-mono font-bold bg-black text-white px-3 py-2 rounded border-2 border-yellow-400">
+                  DEPLOY_PROOF: commit={process.env.VERCEL_GIT_COMMIT_SHA?.substring(0, 7) || 'local'} env={process.env.VERCEL_ENV || 'local'} usesAppShell=true
+                </div>
                 <p className="text-sm text-gray-500 mt-1">
                   {activeOrg
                     ? `Cost overview for ${activeOrg.name}`
