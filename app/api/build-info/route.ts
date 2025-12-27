@@ -6,12 +6,16 @@ export async function GET(request: NextRequest) {
   const commitSha = process.env.VERCEL_GIT_COMMIT_SHA || 'local'
   const env = process.env.VERCEL_ENV || 'local'
   const buildTimestamp = new Date().toISOString()
+  const vercelUrl = process.env.VERCEL_URL || null
+  const deploymentId = process.env.VERCEL_DEPLOYMENT_ID || null
   
   return NextResponse.json(
     {
       commitShaShort: commitSha.substring(0, 7),
       env: env,
       buildTimestamp: buildTimestamp,
+      vercelUrl: vercelUrl,
+      deploymentId: deploymentId,
     },
     {
       status: 200,

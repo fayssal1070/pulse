@@ -287,15 +287,9 @@ export default async function DashboardPage({
                     ? `Cost overview for ${activeOrg.name}`
                     : 'Cost overview across all your organizations'}
                 </p>
-                {/* Build Info Badge - Proof visuelle */}
-                <div className="mt-2 inline-block text-xs font-mono bg-gray-100 px-2 py-1 rounded border border-gray-300">
-                  <span className="text-gray-600">{process.env.VERCEL_ENV || 'local'}</span>
-                  {' • '}
-                  <span className="text-blue-600 font-bold">{(process.env.VERCEL_GIT_COMMIT_SHA || 'local').substring(0, 7)}</span>
-                </div>
-                {/* Proof: Dashboard uses AppShell */}
-                <div className="mt-1 text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded border border-green-200">
-                  ✅ Dashboard uses: AppShell (app/dashboard/page.tsx)
+                {/* NAV SOURCE: AppShell - Proof obligatoire */}
+                <div className="mt-2 text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded border-2 border-red-300">
+                  NAV SOURCE: AppShell (app/dashboard/page.tsx)
                 </div>
                 {/* UI Debug - Proof irréfutable */}
                 <div className="mt-2">
