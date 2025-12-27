@@ -5,6 +5,11 @@ import type { NextRequest } from 'next/server'
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   
+  // Early return for /api/build-info - must be excluded completely
+  if (pathname === '/api/build-info') {
+    return NextResponse.next()
+  }
+  
   // Vérifier le cookie de session NextAuth
   const sessionToken = request.cookies.get('next-auth.session-token')?.value || 
                        request.cookies.get('__Secure-next-auth.session-token')?.value
@@ -41,11 +46,11 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api/build-info (public build info endpoint)
+     * - /api/build-info (public build info endpoint - excluded from middleware)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      */
-    '/((?!api/build-info|_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/build-info).*)',
   ],
 }
