@@ -140,7 +140,7 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
       </div>
 
       {/* Desktop sidebar - FORCE VISIBLE on desktop >= 1024px */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col" style={{ zIndex: 30 }}>
+      <div className="hidden lg:flex lg:fixed lg:inset-y-0 lg:w-64 lg:flex-col" data-testid="app-shell-sidebar" style={{ zIndex: 30 }}>
         <div className="flex flex-col flex-grow bg-white border-r border-gray-200">
           <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
             <Link href="/dashboard" className="text-xl font-bold text-gray-900">
@@ -212,7 +212,7 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
             </div>
           </div>
         </div>
-        <main>{children}</main>
+        <main data-testid="app-shell-main">{children}</main>
       </div>
     </div>
   )

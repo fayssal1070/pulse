@@ -21,6 +21,7 @@ import FormattedDate from '@/components/formatted-date'
 import ErrorBoundary from '@/components/error-boundary'
 import HydrationErrorDetector from '@/components/hydration-error-detector'
 import AppShellProbe from '@/components/appshell-probe'
+import UIDebug from '@/components/ui-debug'
 import { isAdmin } from '@/lib/admin-helpers'
 
 export default async function DashboardPage({
@@ -295,6 +296,10 @@ export default async function DashboardPage({
                 {/* Proof: Dashboard uses AppShell */}
                 <div className="mt-1 text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded border border-green-200">
                   ✅ Dashboard uses: AppShell (app/dashboard/page.tsx)
+                </div>
+                {/* UI Debug - Proof irréfutable */}
+                <div className="mt-2">
+                  <UIDebug />
                 </div>
               </div>
               {/* Only render DebugCostsButton if user is admin (server-side gating) */}
