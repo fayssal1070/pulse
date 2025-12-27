@@ -22,8 +22,6 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Cache-Control': 'no-store, max-age=0',
-        'CDN-Cache-Control': 'no-store',
-        'Vercel-CDN-Cache-Control': 'no-store',
         'Content-Type': 'application/json',
       },
     }
