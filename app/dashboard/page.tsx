@@ -287,11 +287,11 @@ export default async function DashboardPage({
                     ? `Cost overview for ${activeOrg.name}`
                     : 'Cost overview across all your organizations'}
                 </p>
-                {/* Build Info - Always visible for debugging */}
-                <div className="mt-2 text-xs text-gray-400 font-mono">
-                  <span>Env: {process.env.VERCEL_ENV || 'local'}</span>
+                {/* Build Info Badge - Proof visuelle */}
+                <div className="mt-2 inline-block text-xs font-mono bg-gray-100 px-2 py-1 rounded border border-gray-300">
+                  <span className="text-gray-600">{process.env.VERCEL_ENV || 'local'}</span>
                   {' • '}
-                  <span>Commit: {(process.env.VERCEL_GIT_COMMIT_SHA || 'local').substring(0, 7)}</span>
+                  <span className="text-blue-600 font-bold">{(process.env.VERCEL_GIT_COMMIT_SHA || 'local').substring(0, 7)}</span>
                 </div>
                 {/* Proof: Dashboard uses AppShell */}
                 <div className="mt-1 text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded border border-green-200">
