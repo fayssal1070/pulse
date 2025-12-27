@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import BuildInfoGlobal from "@/components/build-info-global";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,12 +24,19 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const commitSha = process.env.VERCEL_GIT_COMMIT_SHA || 'local'
+  const env = process.env.VERCEL_ENV || 'local'
+  
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          {/* Build info - visible everywhere, even without AppShell */}
+          <BuildInfoGlobal commitSha={commitSha} env={env} />
+          {children}
+        </Providers>
       </body>
     </html>
   );
