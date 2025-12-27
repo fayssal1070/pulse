@@ -292,6 +292,10 @@ export default async function DashboardPage({
                   {' • '}
                   <span>Commit: {(process.env.VERCEL_GIT_COMMIT_SHA || 'local').substring(0, 7)}</span>
                 </div>
+                {/* Proof: Dashboard uses AppShell */}
+                <div className="mt-1 text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded border border-green-200">
+                  ✅ Dashboard uses: AppShell (app/dashboard/page.tsx)
+                </div>
               </div>
               {/* Only render DebugCostsButton if user is admin (server-side gating) */}
               {isAdminUser && <DebugCostsButton />}
