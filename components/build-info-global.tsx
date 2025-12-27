@@ -22,6 +22,7 @@ export default function BuildInfoGlobal({ commitSha, env }: BuildInfoGlobalProps
     >
       <div className="flex items-center gap-2">
         <span className="text-gray-400">{env}</span>
+        <span className="text-gray-500">•</span>
         <span className="text-blue-400 font-bold">{commitShaShort}</span>
       </div>
     </div>

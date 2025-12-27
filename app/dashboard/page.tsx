@@ -20,6 +20,7 @@ import LastSyncedDate from '@/components/last-synced-date'
 import FormattedDate from '@/components/formatted-date'
 import ErrorBoundary from '@/components/error-boundary'
 import HydrationErrorDetector from '@/components/hydration-error-detector'
+import AppShellProbe from '@/components/appshell-probe'
 import { isAdmin } from '@/lib/admin-helpers'
 
 export default async function DashboardPage({
@@ -251,6 +252,7 @@ export default async function DashboardPage({
   return (
     <ErrorBoundary>
       <HydrationErrorDetector />
+      <AppShellProbe mounted={true} source="app/dashboard/page.tsx" />
       <AppShell 
         organizations={organizations} 
         activeOrgId={activeOrg?.id || null} 
