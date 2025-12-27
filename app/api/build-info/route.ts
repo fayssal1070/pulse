@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(
     {
       commitShaShort: commitSha.substring(0, 7),
+      commitSha: commitSha,
       env: env,
       buildTimestamp: buildTimestamp,
       vercelUrl: vercelUrl,
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
     {
       status: 200,
       headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Cache-Control': 'no-store, max-age=0',
         'CDN-Cache-Control': 'no-store',
         'Vercel-CDN-Cache-Control': 'no-store',
         'Content-Type': 'application/json',

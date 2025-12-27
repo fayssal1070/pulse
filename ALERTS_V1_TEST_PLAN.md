@@ -403,3 +403,5 @@ npx prisma generate
 - Les notifications sont créées pour tous les membres de l'organisation
 - Les notifications org-wide (userId = null) sont également créées
 
+
+

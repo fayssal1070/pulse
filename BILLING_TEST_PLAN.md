@@ -477,3 +477,5 @@ This document describes test scenarios for Stripe billing integration and featur
 - Webhooks are idempotent (safe to retry)
 - Multi-org isolation is strict (all queries filter by orgId)
 
+
+

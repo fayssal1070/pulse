@@ -182,3 +182,5 @@ const completedCount = steps.filter(s => s.completed).length
 - Step 4: `alertRulesCount > 0`
 - Steps 1-2: Not tracked (info only)
 
+
+

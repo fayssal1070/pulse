@@ -279,3 +279,5 @@ Tous les logs sont au format JSON avec le préfixe `[AWS_SYNC_DEBUG]` :
 
 Après diagnostic, retirer `AWS_SYNC_DEBUG` de Vercel ou le mettre à `false` pour éviter les logs volumineux.
 
+
+

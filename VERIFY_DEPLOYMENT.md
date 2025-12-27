@@ -143,3 +143,5 @@ Ces variables sont disponibles côté serveur et sont exposées au client via `n
 - Le commit hash complet est disponible dans `/api/debug/costs`
 - Les variables Vercel sont automatiquement disponibles, pas besoin de les configurer manuellement
 
+
+

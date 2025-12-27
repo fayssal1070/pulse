@@ -184,3 +184,5 @@ Attendre auto-deploy Vercel (2-3 min)
 **Si 1 seul OK :** Problème de routing/layout
 **Si aucun OK :** Problème de déploiement Vercel
 
+
+

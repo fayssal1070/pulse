@@ -14,3 +14,5 @@ CREATE INDEX "Organization_stripeCustomerId_idx" ON "Organization"("stripeCustom
 -- CreateIndex
 CREATE INDEX "Organization_stripeSubscriptionId_idx" ON "Organization"("stripeSubscriptionId");
 
+
+

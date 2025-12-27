@@ -31,3 +31,5 @@ export default function LastSyncedDate({ date }: LastSyncedDateProps) {
   return <span className="text-xs text-gray-500">Dernière sync: {formatted}</span>
 }
 
+
+

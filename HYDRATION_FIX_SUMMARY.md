@@ -86,3 +86,5 @@ export default function DebugCostsButton() {
 **Message** : "Fix: move admin gating to server-side in DebugCostsButton to prevent hydration mismatch"  
 **Status** : Prêt pour déploiement
 
+
+

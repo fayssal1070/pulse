@@ -150,3 +150,5 @@ npm run build
 - Le formulaire fonctionne sans JavaScript (grace à la redirection serveur)
 - Les leads peuvent être archivés (soft delete) ou supprimés définitivement
 
+
+

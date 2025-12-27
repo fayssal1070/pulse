@@ -178,3 +178,5 @@ Pour augmenter les coûts AWS EC2 de 1200€ à 2000€ :
 
 Les totaux et le trend seront automatiquement recalculés !
 
+
+

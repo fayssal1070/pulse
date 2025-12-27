@@ -83,3 +83,5 @@ CREATE INDEX "InAppNotification_orgId_createdAt_idx" ON "InAppNotification"("org
 -- AddForeignKey
 ALTER TABLE "AlertEvent" ADD CONSTRAINT "AlertEvent_alertId_fkey" FOREIGN KEY ("alertId") REFERENCES "AlertRule"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+
+

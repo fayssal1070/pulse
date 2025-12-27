@@ -147,3 +147,5 @@ Le JSON doit contenir :
 - Les métriques clés sont mises en évidence avec des couleurs (bleu pour sum, vert pour count)
 - Le JSON est formaté avec `JSON.stringify(data, null, 2)` pour une lecture facile
 
+
+

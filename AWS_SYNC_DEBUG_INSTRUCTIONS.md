@@ -152,3 +152,5 @@ Chercher le log avec `stage: "after_db_insert"`:
 
 Après diagnostic, retirer `AWS_SYNC_DEBUG` de Vercel ou le mettre à `0` pour éviter les logs volumineux.
 
+
+
