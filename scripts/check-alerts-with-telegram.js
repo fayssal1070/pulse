@@ -5,28 +5,56 @@ const prisma = new PrismaClient()
 
 async function sendTelegramMessage(botToken, chatId, message) {
   try {
+    const https = require('https')
     const url = `https://api.telegram.org/bot${botToken}/sendMessage`
-    const response = await fetch(url, {
+    
+    // Use Node.js https module with proper TLS handling (no NODE_TLS_REJECT_UNAUTHORIZED needed)
+    const data = JSON.stringify({
+      chat_id: chatId,
+      text: message,
+      parse_mode: 'HTML',
+    })
+
+    const options = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data),
       },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: 'HTML',
-      }),
-    })
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ description: 'Unknown error' }))
-      console.error('Telegram API error:', error)
-      return false
+      // Let Node.js use system CA certificates (default behavior)
     }
 
-    return true
+    return new Promise((resolve) => {
+      const req = https.request(url, options, (res) => {
+        let responseData = ''
+        res.on('data', (chunk) => {
+          responseData += chunk
+        })
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(true)
+          } else {
+            try {
+              const error = JSON.parse(responseData)
+              console.error('Telegram API error:', error)
+            } catch {
+              console.error('Telegram API error:', responseData)
+            }
+            resolve(false)
+          }
+        })
+      })
+
+      req.on('error', (error) => {
+        console.error('Telegram send error:', error.message)
+        resolve(false)
+      })
+
+      req.write(data)
+      req.end()
+    })
   } catch (error) {
-    console.error('Telegram send error:', error)
+    console.error('Telegram send error:', error.message)
     return false
   }
 }
