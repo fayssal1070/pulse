@@ -2,103 +2,227 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { getUserOrganizations } from '@/lib/organizations'
 import { getActiveOrganization } from '@/lib/active-org'
 import { prisma } from '@/lib/prisma'
+import { redirect } from 'next/navigation'
+import AppShell from '@/components/app-shell'
+import SyncNowButton from '@/components/sync-now-button'
 import Link from 'next/link'
-import LogoutButton from '@/components/logout-button'
-import OrgSwitcher from '@/components/org-switcher'
-import CloudAccountForm from '@/components/cloud-account-form'
-import CloudAccountsList from '@/components/cloud-accounts-list'
+import FormattedDate from '@/components/formatted-date'
 
 export default async function AccountsPage() {
   const user = await requireAuth()
   const organizations = await getUserOrganizations(user.id)
   const activeOrg = await getActiveOrganization(user.id)
 
-  if (!activeOrg) {
+  if (organizations.length === 0) {
+    redirect('/organizations/new')
+  }
+
+  // Get all cloud accounts from all organizations user has access to
+  const orgIds = organizations.map((o) => o.id)
+  const allAccounts = await prisma.cloudAccount.findMany({
+    where: {
+      orgId: { in: orgIds },
+    },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      organization: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  })
+
+  // Group accounts by organization
+  const accountsByOrg = allAccounts.reduce((acc, account) => {
+    const orgId = account.orgId
+    if (!acc[orgId]) {
+      acc[orgId] = {
+        org: account.organization,
+        accounts: [],
+      }
+    }
+    acc[orgId].accounts.push(account)
+    return acc
+  }, {} as Record<string, { org: { id: string; name: string }; accounts: typeof allAccounts }>)
+
+  // Check if there's any active AWS account
+  const hasActiveAWS = allAccounts.some(
+    (acc) => acc.provider === 'AWS' && acc.connectionType === 'COST_EXPLORER' && acc.status === 'active'
+  )
+
+  const getStatusBadge = (status: string) => {
+    const statusMap: Record<string, { label: string; className: string }> = {
+      active: { label: 'Active', className: 'bg-green-100 text-green-800' },
+      pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-800' },
+      disabled: { label: 'Disabled', className: 'bg-gray-100 text-gray-800' },
+    }
+    const statusInfo = statusMap[status] || { label: status, className: 'bg-gray-100 text-gray-800' }
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-500 mb-4">No active organization found.</p>
-          <Link href="/organizations/new" className="text-blue-600 hover:text-blue-700">
-            Create an organization
-          </Link>
-        </div>
-      </div>
+      <span className={`px-2 py-1 text-xs font-semibold rounded ${statusInfo.className}`}>
+        {statusInfo.label}
+      </span>
     )
   }
 
-  const cloudAccounts = await prisma.cloudAccount.findMany({
-    where: { orgId: activeOrg.id },
-    orderBy: { createdAt: 'desc' },
-  })
-
-  const accountsByStatus = {
-    active: cloudAccounts.filter(a => a.status === 'active').length,
-    pending: cloudAccounts.filter(a => a.status === 'pending').length,
-    disabled: cloudAccounts.filter(a => a.status === 'disabled').length,
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Link href="/dashboard" className="text-2xl font-bold text-gray-900">
-                PULSE
-              </Link>
-              <span className="text-gray-400">/</span>
-              <span className="text-gray-700">Cloud Accounts</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <OrgSwitcher organizations={organizations} activeOrgId={activeOrg.id} />
-              <Link href="/dashboard" className="text-gray-700 hover:text-gray-900">
-                Dashboard
-              </Link>
-              <LogoutButton />
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <AppShell organizations={organizations} activeOrgId={activeOrg?.id || null} hasActiveAWS={hasActiveAWS}>
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Cloud Accounts</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Manage cloud accounts for {activeOrg.name}
-            </p>
+          <div className="mb-6 flex justify-between items-start">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Cloud Accounts</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Manage cloud accounts across all your organizations
+              </p>
+            </div>
+            {activeOrg && (
+              <Link
+                href={`/organizations/${activeOrg.id}/cloud-accounts/connect/aws`}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+              >
+                + Connect AWS
+              </Link>
+            )}
           </div>
 
           {/* Summary */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-lg shadow p-4">
               <p className="text-sm text-gray-500">Total Accounts</p>
-              <p className="text-2xl font-bold text-gray-900">{cloudAccounts.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{allAccounts.length}</p>
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <p className="text-sm text-gray-500">Active</p>
-              <p className="text-2xl font-bold text-green-600">{accountsByStatus.active}</p>
+              <p className="text-2xl font-bold text-green-600">
+                {allAccounts.filter((a) => a.status === 'active').length}
+              </p>
             </div>
             <div className="bg-white rounded-lg shadow p-4">
               <p className="text-sm text-gray-500">Pending</p>
-              <p className="text-2xl font-bold text-yellow-600">{accountsByStatus.pending}</p>
+              <p className="text-2xl font-bold text-yellow-600">
+                {allAccounts.filter((a) => a.status === 'pending').length}
+              </p>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <p className="text-sm text-gray-500">Organizations</p>
+              <p className="text-2xl font-bold text-gray-900">{Object.keys(accountsByOrg).length}</p>
             </div>
           </div>
 
-          {/* Add Account Form */}
-          <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Cloud Account</h3>
-            <CloudAccountForm organizationId={activeOrg.id} />
-          </div>
-
-          {/* Accounts List */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">All Accounts</h3>
-            <CloudAccountsList accounts={cloudAccounts} />
-          </div>
+          {/* Accounts grouped by organization */}
+          {Object.keys(accountsByOrg).length === 0 ? (
+            <div className="bg-white rounded-lg shadow p-12 text-center">
+              <p className="text-gray-500 mb-4">No cloud accounts found.</p>
+              {activeOrg && (
+                <Link
+                  href={`/organizations/${activeOrg.id}/cloud-accounts/connect/aws`}
+                  className="text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Connect your first AWS account →
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {Object.values(accountsByOrg).map(({ org, accounts }) => (
+                <div key={org.id} className="bg-white rounded-lg shadow">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-900">{org.name}</h3>
+                      <Link
+                        href={`/organizations/${org.id}/cloud-accounts`}
+                        className="text-sm text-blue-600 hover:text-blue-700"
+                      >
+                        Manage →
+                      </Link>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Account Name
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Provider
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Last Synced
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {accounts.map((account) => (
+                          <tr key={account.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">{account.accountName}</div>
+                              {account.accountIdentifier && (
+                                <div className="text-xs text-gray-500">{account.accountIdentifier}</div>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{account.provider}</div>
+                              {account.connectionType && (
+                                <div className="text-xs text-gray-500">{account.connectionType}</div>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(account.status)}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {account.lastSyncedAt ? (
+                                <FormattedDate
+                                  date={account.lastSyncedAt}
+                                  locale="en-US"
+                                  options={{
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  }}
+                                />
+                              ) : (
+                                'Never'
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                              {account.provider === 'AWS' &&
+                                account.connectionType === 'COST_EXPLORER' &&
+                                account.status === 'active' && (
+                                  <SyncNowButton accountId={account.id} orgId={org.id} />
+                                )}
+                              <Link
+                                href={`/organizations/${org.id}/cloud-accounts/${account.id}/records`}
+                                className="text-blue-600 hover:text-blue-700"
+                              >
+                                View Records
+                              </Link>
+                              <Link
+                                href={`/organizations/${org.id}/cloud-accounts`}
+                                className="text-gray-600 hover:text-gray-900"
+                              >
+                                Manage
+                              </Link>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }
-

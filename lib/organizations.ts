@@ -23,6 +23,7 @@ export async function getUserOrganizations(userId: string) {
     name: m.organization.name,
     createdAt: m.organization.createdAt,
     role: m.role,
+    plan: m.organization.plan,
     members: m.organization.memberships.map((mem) => ({
       id: mem.id,
       userId: mem.userId,
@@ -64,6 +65,13 @@ export async function getOrganizationById(organizationId: string, userId: string
     name: membership.organization.name,
     createdAt: membership.organization.createdAt,
     role: membership.role,
+    plan: membership.organization.plan,
+    stripeCustomerId: membership.organization.stripeCustomerId,
+    stripeSubscriptionId: membership.organization.stripeSubscriptionId,
+    stripePriceId: membership.organization.stripePriceId,
+    subscriptionStatus: membership.organization.subscriptionStatus,
+    currentPeriodEnd: membership.organization.currentPeriodEnd,
+    cancelAtPeriodEnd: membership.organization.cancelAtPeriodEnd,
     members: membership.organization.memberships.map((mem) => ({
       id: mem.id,
       userId: mem.userId,

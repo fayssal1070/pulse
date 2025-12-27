@@ -3,8 +3,7 @@ import { getUserOrganizations } from '@/lib/organizations'
 import { getActiveOrganization } from '@/lib/active-org'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
-import LogoutButton from '@/components/logout-button'
-import OrgSwitcher from '@/components/org-switcher'
+import AppShell from '@/components/app-shell'
 import InviteForm from '@/components/invite-form'
 
 export default async function TeamPage() {
@@ -48,30 +47,11 @@ export default async function TeamPage() {
   const userMembership = members.find((m) => m.userId === user.id)
   const userRole = userMembership?.role || 'member'
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Link href="/dashboard" className="text-2xl font-bold text-gray-900">
-                PULSE
-              </Link>
-              <span className="text-gray-400">/</span>
-              <span className="text-gray-700">Team</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <OrgSwitcher organizations={organizations} activeOrgId={activeOrg.id} />
-              <Link href="/dashboard" className="text-gray-700 hover:text-gray-900">
-                Dashboard
-              </Link>
-              <LogoutButton />
-            </div>
-          </div>
-        </div>
-      </nav>
+  const hasActiveAWS = false
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+  return (
+    <AppShell organizations={organizations} activeOrgId={activeOrg?.id || null} hasActiveAWS={hasActiveAWS}>
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Team Management - {activeOrg.name}</h2>
@@ -139,7 +119,7 @@ export default async function TeamPage() {
             )}
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }

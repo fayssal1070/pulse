@@ -66,7 +66,11 @@ export default function NewAlertForm({ organizationId }: NewAlertFormProps) {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Failed to create alert')
+        if (data.code === 'LIMIT_REACHED') {
+          setError(`${data.error} Please upgrade your plan to add more alerts.`)
+        } else {
+          setError(data.error || 'Failed to create alert')
+        }
         return
       }
 

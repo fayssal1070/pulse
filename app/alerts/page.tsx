@@ -2,19 +2,22 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { getUserOrganizations } from '@/lib/organizations'
 import { getActiveOrganization } from '@/lib/active-org'
 import { prisma } from '@/lib/prisma'
+import { redirect } from 'next/navigation'
+import AppShell from '@/components/app-shell'
 import Link from 'next/link'
-import LogoutButton from '@/components/logout-button'
-import OrgSwitcher from '@/components/org-switcher'
-import AlertForm from '@/components/alert-form'
 
 export default async function AlertsPage() {
   const user = await requireAuth()
   const organizations = await getUserOrganizations(user.id)
   const activeOrg = await getActiveOrganization(user.id)
 
-  // Récupérer les règles d'alerte de l'org active (ou toutes si aucune spécifiée)
-  const orgIds = activeOrg ? [activeOrg.id] : organizations.map((org) => org.id)
-  const alertRules = await prisma.alertRule.findMany({
+  if (organizations.length === 0) {
+    redirect('/organizations/new')
+  }
+
+  // Get all alerts from all organizations user has access to
+  const orgIds = organizations.map((o) => o.id)
+  const allAlerts = await prisma.alertRule.findMany({
     where: {
       orgId: { in: orgIds },
     },
@@ -25,138 +28,177 @@ export default async function AlertsPage() {
           name: true,
         },
       },
+      _count: {
+        select: { alertEvents: true },
+      },
     },
     orderBy: { createdAt: 'desc' },
   })
 
+  // Group alerts by organization
+  const alertsByOrg = allAlerts.reduce((acc, alert) => {
+    const orgId = alert.orgId
+    if (!acc[orgId]) {
+      acc[orgId] = {
+        org: alert.organization,
+        alerts: [],
+      }
+    }
+    acc[orgId].alerts.push(alert)
+    return acc
+  }, {} as Record<string, { org: { id: string; name: string }; alerts: typeof allAlerts }>)
+
+  // Check if there's any active AWS account
+  const hasActiveAWS = false // Will be computed if needed
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Link href="/dashboard" className="text-2xl font-bold text-gray-900">
-                PULSE
-              </Link>
-              <span className="text-gray-400">/</span>
-              <span className="text-gray-700">Alerts</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <OrgSwitcher organizations={organizations} activeOrgId={activeOrg?.id || null} />
-              <Link href="/dashboard" className="text-gray-700 hover:text-gray-900">
-                Dashboard
-              </Link>
-              <LogoutButton />
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <AppShell organizations={organizations} activeOrgId={activeOrg?.id || null} hasActiveAWS={hasActiveAWS}>
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Alert Rules</h2>
-            <p className="text-sm text-gray-500 mt-1">Manage cost alert rules for your organizations</p>
-          </div>
-
-          {/* Create Alert Form */}
-          {activeOrg ? (
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Create Alert Rule for {activeOrg.name}
-              </h3>
-              <AlertForm />
-            </div>
-          ) : (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-              <p className="text-sm text-yellow-800">
-                Please select an organization to create alert rules.
+          <div className="mb-6 flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Alerts</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Manage cost alerts across all your organizations
               </p>
             </div>
-          )}
-
-          {/* Alert Rules List */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Existing Alert Rules</h3>
-            {alertRules.length === 0 ? (
-              <p className="text-gray-500 text-sm">No alert rules configured</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Organization
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Name
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Threshold (EUR)
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Last Triggered
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {alertRules.map((rule) => (
-                      <tr
-                        key={rule.id}
-                        className={rule.lastTriggeredAt ? 'bg-red-50' : 'hover:bg-gray-50'}
-                      >
-                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {rule.organization.name}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                          {rule.name}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                          {rule.thresholdEUR.toFixed(2)}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                          {rule.type === 'MONTHLY_BUDGET' ? 'Monthly Budget' : 'Daily Spike'}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span
-                            className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                              rule.lastTriggeredAt
-                                ? 'bg-red-100 text-red-800'
-                                : rule.enabled
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            {rule.lastTriggeredAt ? 'Triggered' : rule.enabled ? 'Active' : 'Disabled'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                          {rule.lastTriggeredAt
-                            ? new Date(rule.lastTriggeredAt).toLocaleString('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })
-                            : '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <Link
+              href="/alerts/new"
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+            >
+              + Create Alert
+            </Link>
           </div>
+
+          {/* Summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div className="bg-white rounded-lg shadow p-4">
+              <p className="text-sm text-gray-500">Total Alerts</p>
+              <p className="text-2xl font-bold text-gray-900">{allAlerts.length}</p>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <p className="text-sm text-gray-500">Active</p>
+              <p className="text-2xl font-bold text-green-600">
+                {allAlerts.filter((a) => a.enabled).length}
+              </p>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <p className="text-sm text-gray-500">Triggered (24h)</p>
+              <p className="text-2xl font-bold text-red-600">
+                {allAlerts.filter((a) => {
+                  if (!a.lastTriggeredAt) return false
+                  const hoursAgo = (Date.now() - new Date(a.lastTriggeredAt).getTime()) / (1000 * 60 * 60)
+                  return hoursAgo <= 24
+                }).length}
+              </p>
+            </div>
+          </div>
+
+          {/* Alerts grouped by organization */}
+          {Object.keys(alertsByOrg).length === 0 ? (
+            <div className="bg-white rounded-lg shadow p-12 text-center">
+              <p className="text-gray-500 mb-4">No alerts configured.</p>
+              <Link
+                href="/alerts/new"
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Create your first alert →
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {Object.values(alertsByOrg).map(({ org, alerts }) => (
+                <div key={org.id} className="bg-white rounded-lg shadow">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-900">{org.name}</h3>
+                      <Link
+                        href={`/organizations/${org.id}/alerts`}
+                        className="text-sm text-blue-600 hover:text-blue-700"
+                      >
+                        Manage →
+                      </Link>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <div className="space-y-4">
+                      {alerts.map((alert) => (
+                        <div
+                          key={alert.id}
+                          className={`p-4 rounded border ${
+                            alert.enabled
+                              ? 'bg-white border-gray-200'
+                              : 'bg-gray-50 border-gray-200 opacity-60'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-2">
+                                <p className="font-medium text-gray-900">{alert.name}</p>
+                                <span
+                                  className={`px-2 py-1 text-xs font-semibold rounded ${
+                                    alert.enabled
+                                      ? 'bg-green-100 text-green-800'
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}
+                                >
+                                  {alert.enabled ? 'ENABLED' : 'DISABLED'}
+                                </span>
+                                <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
+                                  {alert.type === 'MONTHLY_BUDGET' ? 'Monthly Budget' : 'Daily Spike'}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-600 space-y-1">
+                                {alert.type === 'MONTHLY_BUDGET' ? (
+                                  <p>
+                                    Alert when spending reaches 50%, 80%, or 100% of{' '}
+                                    <span className="font-medium">{alert.thresholdEUR.toFixed(2)} EUR</span>{' '}
+                                    monthly budget
+                                  </p>
+                                ) : (
+                                  <p>
+                                    Alert when daily spend{' '}
+                                    {alert.spikePercent && (
+                                      <>
+                                        spikes by <span className="font-medium">{alert.spikePercent}%</span> vs{' '}
+                                        {alert.lookbackDays}-day baseline
+                                      </>
+                                    )}
+                                    {alert.spikePercent && alert.thresholdEUR > 0 && ' or '}
+                                    {alert.thresholdEUR > 0 && (
+                                      <>
+                                        exceeds <span className="font-medium">{alert.thresholdEUR.toFixed(2)} EUR</span>
+                                      </>
+                                    )}
+                                  </p>
+                                )}
+                                <p className="text-xs text-gray-500">
+                                  Cooldown: {alert.cooldownHours}h • Events: {alert._count.alertEvents}
+                                  {alert.lastTriggeredAt && (
+                                    <> • Last triggered: {new Date(alert.lastTriggeredAt).toLocaleString()}</>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2 ml-4">
+                              <Link
+                                href={`/organizations/${org.id}/alerts/${alert.id}/edit`}
+                                className="px-3 py-1 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                              >
+                                Edit
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }
-

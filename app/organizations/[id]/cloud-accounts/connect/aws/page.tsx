@@ -172,7 +172,11 @@ export default function ConnectAWSPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Failed to save connection')
+        if (data.code === 'LIMIT_REACHED') {
+          setError(`${data.error} Please upgrade your plan to add more cloud accounts.`)
+        } else {
+          setError(data.error || 'Failed to save connection')
+        }
         return
       }
 

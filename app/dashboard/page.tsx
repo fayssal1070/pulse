@@ -7,8 +7,8 @@ import { hasAnyData, hasDemoData } from '@/lib/demo-data'
 import { getOnboardingStatus } from '@/lib/onboarding'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
-import LogoutButton from '@/components/logout-button'
-import OrgSwitcher from '@/components/org-switcher'
+import AppShell from '@/components/app-shell'
+import SyncNowButton from '@/components/sync-now-button'
 import DemoBanner from '@/components/demo-banner'
 import LoadDemoButton from '@/components/load-demo-button'
 import SetupProgressWidget from '@/components/setup-progress-widget'
@@ -216,13 +216,44 @@ export default async function DashboardPage({
     budgetInfo = { currentCosts: currentMonthCosts, budget, percentage, status }
   }
 
+  // Get unread notifications count
+  let unreadNotificationsCount = 0
+  if (activeOrgId) {
+    const unreadNotifications = await prisma.inAppNotification.count({
+      where: {
+        orgId: activeOrgId,
+        OR: [{ userId: user.id }, { userId: null }],
+        readAt: null,
+      },
+    })
+    unreadNotificationsCount = unreadNotifications
+  }
+
+  // Get alerts summary
+  let alertsSummary = null
+  if (activeOrgId) {
+    const [activeAlerts, lastTriggeredAlert] = await Promise.all([
+      prisma.alertRule.count({
+        where: { orgId: activeOrgId, enabled: true },
+      }),
+      prisma.alertRule.findFirst({
+        where: { orgId: activeOrgId, lastTriggeredAt: { not: null } },
+        orderBy: { lastTriggeredAt: 'desc' },
+        select: { lastTriggeredAt: true },
+      }),
+    ])
+    alertsSummary = {
+      active: activeAlerts,
+      lastTriggered: lastTriggeredAlert?.lastTriggeredAt || null,
+    }
+  }
+
   return (
     <ErrorBoundary>
       <HydrationErrorDetector />
-      <div className="min-h-screen bg-gray-50">
+      <AppShell organizations={organizations} activeOrgId={activeOrg?.id || null} hasActiveAWS={hasActiveAWS}>
         {showAdminError && (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
@@ -236,125 +267,166 @@ export default async function DashboardPage({
               </div>
             </div>
           </div>
-        </div>
-      )}
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900">PULSE</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <OrgSwitcher organizations={organizations} activeOrgId={activeOrg?.id || null} />
-              <Link href="/team" className="text-gray-700 hover:text-gray-900">
-                Team
-              </Link>
-              <Link href="/notifications" className="text-gray-700 hover:text-gray-900">
-                Notifications
-              </Link>
-              <LogoutButton />
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="mb-6 flex justify-between items-start">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                {activeOrg
-                  ? `Cost overview for ${activeOrg.name}`
-                  : 'Cost overview across all your organizations'}
-              </p>
-            </div>
-            {/* Only render DebugCostsButton if user is admin (server-side gating) */}
-            {isAdminUser && <DebugCostsButton />}
-          </div>
-
-          {/* Setup Complete Banner */}
-          {activeOrgId && onboardingStatus?.completed && (
-            <SetupCompleteBanner />
-          )}
-
-          {/* Demo Banner */}
-          {activeOrgId && isDemo && (
-            <DemoBanner organizationId={activeOrgId} />
-          )}
-
-          {/* NO_SPEND_YET Banner (AWS active but no spend detected) */}
-          {bannerState === 'NO_SPEND_YET' && (
-            <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-blue-700">
-                    <span className="font-medium">No spend yet</span> — {bannerMessage}
-                  </p>
+        )}
+        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0">
+            <div className="mb-6 flex justify-between items-start">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {activeOrg
+                    ? `Cost overview for ${activeOrg.name}`
+                    : 'Cost overview across all your organizations'}
+                </p>
+                {/* Build Info - Always visible for debugging */}
+                <div className="mt-2 text-xs text-gray-400 font-mono">
+                  <span>Env: {process.env.VERCEL_ENV || 'local'}</span>
+                  {' • '}
+                  <span>Commit: {(process.env.VERCEL_GIT_COMMIT_SHA || 'local').substring(0, 7)}</span>
                 </div>
               </div>
+              {/* Only render DebugCostsButton if user is admin (server-side gating) */}
+              {isAdminUser && <DebugCostsButton />}
             </div>
-          )}
 
-          {/* DATA_PENDING Banner (Cost Explorer not ready) */}
-          {bannerState === 'DATA_PENDING' && (
-            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-yellow-700">
-                    <span className="font-medium">Data Pending</span> — {bannerMessage}
-                  </p>
-                </div>
+            {/* Quick Actions Section */}
+            <div className="mb-6 bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                {!hasActiveAWS && activeOrgId && (
+                  <Link
+                    href={`/organizations/${activeOrgId}/cloud-accounts/connect/aws`}
+                    className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                  >
+                    <span className="text-3xl mb-2">☁️</span>
+                    <span className="text-sm font-medium text-gray-700 text-center">Connect AWS</span>
+                  </Link>
+                )}
+                {hasActiveAWS && (
+                  <div className="flex flex-col items-center justify-center p-4 border-2 border-gray-200 rounded-lg bg-gray-50">
+                    <SyncNowButton />
+                  </div>
+                )}
+                <Link
+                  href="/accounts"
+                  className="flex flex-col items-center justify-center p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                >
+                  <span className="text-3xl mb-2">☁️</span>
+                  <span className="text-sm font-medium text-gray-700 text-center">Cloud Accounts</span>
+                </Link>
+                <Link
+                  href="/alerts/new"
+                  className="flex flex-col items-center justify-center p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                >
+                  <span className="text-3xl mb-2">🔔</span>
+                  <span className="text-sm font-medium text-gray-700 text-center">Create Alert</span>
+                </Link>
+                {activeOrgId && (
+                  <Link
+                    href={`/organizations/${activeOrgId}/billing`}
+                    className="flex flex-col items-center justify-center p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                  >
+                    <span className="text-3xl mb-2">💳</span>
+                    <span className="text-sm font-medium text-gray-700 text-center">Billing</span>
+                  </Link>
+                )}
+                <Link
+                  href="/notifications"
+                  className="flex flex-col items-center justify-center p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors relative"
+                >
+                  <span className="text-3xl mb-2">🔔</span>
+                  <span className="text-sm font-medium text-gray-700 text-center">Notifications</span>
+                  {unreadNotificationsCount > 0 && (
+                    <span className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                      {unreadNotificationsCount}
+                    </span>
+                  )}
+                </Link>
               </div>
             </div>
-          )}
 
-          {/* Setup Progress Widget */}
-          {activeOrgId && onboardingStatus && !onboardingStatus.completed && (
-            <SetupProgressWidget
+            {/* Setup Complete Banner */}
+            {activeOrgId && onboardingStatus?.completed && (
+              <SetupCompleteBanner />
+            )}
+
+            {/* Demo Banner */}
+            {activeOrgId && isDemo && (
+              <DemoBanner organizationId={activeOrgId} />
+            )}
+
+            {/* NO_SPEND_YET Banner (AWS active but no spend detected) */}
+            {bannerState === 'NO_SPEND_YET' && (
+              <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-blue-700">
+                      <span className="font-medium">No spend yet</span> — {bannerMessage}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* DATA_PENDING Banner (Cost Explorer not ready) */}
+            {bannerState === 'DATA_PENDING' && (
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-yellow-700">
+                      <span className="font-medium">Data Pending</span> — {bannerMessage}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Setup Progress Widget */}
+            {activeOrgId && onboardingStatus && !onboardingStatus.completed && (
+              <SetupProgressWidget
               currentStep={onboardingStatus.currentStep || 1}
               step1Completed={onboardingStatus.step1Completed || false}
               step2Completed={onboardingStatus.step2Completed || false}
               step3Completed={onboardingStatus.step3Completed || false}
-            />
-          )}
+              />
+            )}
 
-          {/* Quickstart Widget */}
-          {activeOrgId && onboardingStatus?.completed && (
-            <QuickstartWidget
+            {/* Quickstart Widget */}
+            {activeOrgId && onboardingStatus?.completed && (
+              <QuickstartWidget
               hasCostData={hasCostData}
               hasAlerts={hasAlerts}
               organizationId={activeOrgId}
               hasActiveAWS={hasActiveAWS}
               awsAccountInfo={awsAccountInfo}
-            />
-          )}
+              />
+            )}
 
-          {/* Load Demo Button */}
-          {activeOrgId && !hasData && (
-            <LoadDemoButton organizationId={activeOrgId} />
-          )}
+            {/* Load Demo Button */}
+            {activeOrgId && !hasData && (
+              <LoadDemoButton organizationId={activeOrgId} />
+            )}
 
-          {/* Totals */}
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Last 7 days</h3>
-              <p className="text-3xl font-bold text-gray-900">{total7Days.toFixed(2)} EUR</p>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Last 30 days</h3>
-              <p className="text-3xl font-bold text-gray-900">{total30Days.toFixed(2)} EUR</p>
-              {total30Days === 0 && hasActiveAWS && awsAccountInfo && (
+            {/* Totals */}
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-sm font-medium text-gray-500 mb-2">Last 7 days</h3>
+                <p className="text-3xl font-bold text-gray-900">{total7Days.toFixed(2)} EUR</p>
+              </div>
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-sm font-medium text-gray-500 mb-2">Last 30 days</h3>
+                <p className="text-3xl font-bold text-gray-900">{total30Days.toFixed(2)} EUR</p>
+                {total30Days === 0 && hasActiveAWS && awsAccountInfo && (
                 <div className="mt-3 pt-3 border-t border-gray-200 space-y-1">
                   <p className="text-xs text-gray-500">0.00 EUR sur 30 jours</p>
                   {awsAccountInfo.lastSyncedAt && (
@@ -383,12 +455,12 @@ export default async function DashboardPage({
                       </Link>
                     )
                   })()}
-                </div>
-              )}
-            </div>
-            {cloudAccountsInfo && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-start mb-2">
+                  </div>
+                )}
+              </div>
+              {cloudAccountsInfo && (
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex justify-between items-start mb-2">
                   <h3 className="text-sm font-medium text-gray-500">Cloud Accounts</h3>
                   <Link
                     href="/accounts"
@@ -403,12 +475,12 @@ export default async function DashboardPage({
                   {cloudAccountsInfo.pending > 0 && (
                     <span className="text-yellow-600">{cloudAccountsInfo.pending} pending</span>
                   )}
+                  </div>
                 </div>
-              </div>
-            )}
-            {budgetInfo && budgetInfo.budget !== null && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-start mb-2">
+              )}
+              {budgetInfo && budgetInfo.budget !== null && (
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex justify-between items-start mb-2">
                   <h3 className="text-sm font-medium text-gray-500">Monthly Budget</h3>
                   <span
                     className={`px-2 py-1 text-xs font-semibold rounded-full ${
@@ -434,14 +506,14 @@ export default async function DashboardPage({
                 >
                   Manage budget →
                 </Link>
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-6">
-            {/* Top Services */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Top 10 Services (30 days)</h3>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-6">
+              {/* Top Services */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Top 10 Services (30 days)</h3>
               {topServices.length === 0 ? (
                 <p className="text-gray-500 text-sm">No costs recorded</p>
               ) : (
@@ -462,9 +534,9 @@ export default async function DashboardPage({
               )}
             </div>
 
-            {/* Organizations */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex justify-between items-center mb-4">
+              {/* Organizations */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Organizations</h3>
                 <Link
                   href="/organizations/new"
@@ -489,59 +561,86 @@ export default async function DashboardPage({
                   ))}
                 </div>
               )}
+              </div>
             </div>
-          </div>
 
-          {/* Daily Series Table */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Costs (30 days)</h3>
-            {dailySeries.length === 0 ? (
-              <p className="text-gray-500 text-sm">No costs recorded</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Total (EUR)
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {dailySeries.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                          <FormattedDate 
-                            date={item.date}
-                            locale="en-US"
-                            options={{
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                            }}
-                          />
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
-                          {item.total.toFixed(2)}
-                        </td>
+            {/* Daily Series Table */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Costs (30 days)</h3>
+              {dailySeries.length === 0 ? (
+                <p className="text-gray-500 text-sm">No costs recorded</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Date
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Total (EUR)
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {dailySeries.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                            <FormattedDate 
+                              date={item.date}
+                              locale="en-US"
+                              options={{
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              }}
+                            />
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
+                            {item.total.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            {/* Alerts Summary */}
+            {alertsSummary && (
+              <div className="mb-6 bg-white rounded-lg shadow p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Active Alerts</p>
+                    <p className="text-2xl font-bold text-gray-900">{alertsSummary.active}</p>
+                  </div>
+                  {alertsSummary.lastTriggered && (
+                    <div className="text-right">
+                      <p className="text-sm text-gray-500">Last Triggered</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {new Date(alertsSummary.lastTriggered).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
+                  <Link
+                    href="/alerts"
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                  >
+                    View All →
+                  </Link>
+                </div>
               </div>
             )}
           </div>
         </div>
-      </main>
-      <AdminDeploymentInfo 
-        isAdmin={isAdminUser}
-        vercelEnv={process.env.VERCEL_ENV || 'development'}
-        commitSha={process.env.VERCEL_GIT_COMMIT_SHA || 'local'}
-      />
-      </div>
+        <div className="px-4">
+          <AdminDeploymentInfo 
+            isAdmin={isAdminUser}
+            vercelEnv={process.env.VERCEL_ENV || 'development'}
+            commitSha={process.env.VERCEL_GIT_COMMIT_SHA || 'local'}
+          />
+        </div>
+      </AppShell>
     </ErrorBoundary>
   )
 }

@@ -1,7 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-helpers'
 import { getActiveOrganizationId } from '@/lib/active-org'
+import { getUserOrganizations } from '@/lib/organizations'
 import { prisma } from '@/lib/prisma'
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await requireAuth()
+    const { searchParams } = new URL(request.url)
+    const orgId = searchParams.get('orgId')
+
+    // Get all organizations user has access to
+    const organizations = await getUserOrganizations(user.id)
+    const orgIds = organizations.map((o) => o.id)
+
+    if (orgIds.length === 0) {
+      return NextResponse.json({ accounts: [] })
+    }
+
+    // Filter by orgId if provided, otherwise get all
+    // Ensure the requested orgId is in the user's orgs
+    const where = orgId
+      ? { orgId: orgIds.includes(orgId) ? orgId : { in: [] } } // If orgId not in user's orgs, return empty
+      : { orgId: { in: orgIds } }
+
+    const accounts = await prisma.cloudAccount.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    })
+
+    return NextResponse.json({ accounts })
+  } catch (error) {
+    console.error('Get cloud accounts error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,6 +78,23 @@ export async function POST(request: NextRequest) {
     const organizations = await getUserOrganizations(user.id)
     if (!organizations.find((o) => o.id === orgId)) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+    }
+
+    // Check entitlements
+    try {
+      const { assertCanCreateCloudAccount } = await import('@/lib/entitlements')
+      await assertCanCreateCloudAccount(orgId)
+    } catch (error: any) {
+      if (error.message?.includes('LIMIT_REACHED')) {
+        return NextResponse.json(
+          {
+            error: error.message,
+            code: 'LIMIT_REACHED',
+          },
+          { status: 402 }
+        )
+      }
+      throw error
     }
 
     if (!provider || !accountName) {

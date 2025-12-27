@@ -1,8 +1,13 @@
 import Link from 'next/link'
 import PublicNav from '@/components/public-nav'
 import PublicFooter from '@/components/public-footer'
+import { getCurrentUser } from '@/lib/auth-helpers'
+import { getActiveOrganization } from '@/lib/active-org'
+import PricingActions from './pricing-actions'
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const user = await getCurrentUser()
+  const activeOrg = user ? await getActiveOrganization(user.id) : null
   return (
     <div className="min-h-screen flex flex-col">
       <PublicNav />
@@ -29,11 +34,10 @@ export default function PricingPage() {
               {/* Starter Tier */}
               <div className="bg-white rounded-lg shadow-lg border-2 border-gray-200 p-8 flex flex-col">
                 <div className="mb-6">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Starter</h3>
-                  <p className="text-gray-600 text-sm mb-4">Perfect for small teams getting started</p>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Free</h3>
+                  <p className="text-gray-600 text-sm mb-4">Perfect for getting started</p>
                   <div className="flex items-baseline">
-                    <span className="text-4xl font-bold text-gray-900">€29</span>
-                    <span className="text-gray-600 ml-2">/month</span>
+                  <span className="text-4xl font-bold text-gray-900">Free</span>
                   </div>
                 </div>
                 <ul className="space-y-3 mb-8 flex-grow">
@@ -68,12 +72,7 @@ export default function PricingPage() {
                     <span className="text-gray-700">Email support</span>
                   </li>
                 </ul>
-                <Link
-                  href="/demo"
-                  className="w-full px-6 py-3 bg-gray-100 text-gray-900 font-medium rounded-md hover:bg-gray-200 transition-colors text-center"
-                >
-                  Try Demo
-                </Link>
+                <PricingActions plan="FREE" user={user} activeOrg={activeOrg} />
               </div>
 
               {/* Pro Tier - Featured */}
@@ -87,8 +86,8 @@ export default function PricingPage() {
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">Pro</h3>
                   <p className="text-gray-600 text-sm mb-4">For growing teams with multiple accounts</p>
                   <div className="flex items-baseline">
-                    <span className="text-4xl font-bold text-gray-900">€99</span>
-                    <span className="text-gray-600 ml-2">/month</span>
+                  <span className="text-4xl font-bold text-gray-900">€49</span>
+                  <span className="text-gray-600 ml-2">/month</span>
                   </div>
                 </div>
                 <ul className="space-y-3 mb-8 flex-grow">
@@ -102,7 +101,7 @@ export default function PricingPage() {
                     <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-gray-700">Unlimited cloud accounts</span>
+                    <span className="text-gray-700">3 cloud accounts</span>
                   </li>
                   <li className="flex items-start">
                     <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -120,7 +119,7 @@ export default function PricingPage() {
                     <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-gray-700">Team collaboration (up to 10 users)</span>
+                    <span className="text-gray-700">Team collaboration (up to 5 members)</span>
                   </li>
                   <li className="flex items-start">
                     <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -129,12 +128,7 @@ export default function PricingPage() {
                     <span className="text-gray-700">Priority support</span>
                   </li>
                 </ul>
-                <Link
-                  href="/demo"
-                  className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors text-center"
-                >
-                  Try Demo
-                </Link>
+                <PricingActions plan="PRO" user={user} activeOrg={activeOrg} />
               </div>
 
               {/* Business Tier */}
@@ -143,8 +137,8 @@ export default function PricingPage() {
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">Business</h3>
                   <p className="text-gray-600 text-sm mb-4">For enterprises with complex needs</p>
                   <div className="flex items-baseline">
-                    <span className="text-4xl font-bold text-gray-900">€299</span>
-                    <span className="text-gray-600 ml-2">/month</span>
+                  <span className="text-4xl font-bold text-gray-900">€149</span>
+                  <span className="text-gray-600 ml-2">/month</span>
                   </div>
                 </div>
                 <ul className="space-y-3 mb-8 flex-grow">
@@ -158,7 +152,7 @@ export default function PricingPage() {
                     <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-gray-700">Unlimited users & organizations</span>
+                    <span className="text-gray-700">10 cloud accounts, 50 alerts, 20 members</span>
                   </li>
                   <li className="flex items-start">
                     <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -191,12 +185,7 @@ export default function PricingPage() {
                     <span className="text-gray-700">24/7 phone support</span>
                   </li>
                 </ul>
-                <Link
-                  href="/demo"
-                  className="w-full px-6 py-3 bg-gray-100 text-gray-900 font-medium rounded-md hover:bg-gray-200 transition-colors text-center"
-                >
-                  Contact Sales
-                </Link>
+                <PricingActions plan="BUSINESS" user={user} activeOrg={activeOrg} />
               </div>
             </div>
 

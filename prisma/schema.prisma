@@ -23,11 +23,21 @@ model Organization {
   telegramChatId        String?
   demoDataLoadedAt      DateTime?
   onboardingCompletedAt DateTime?
+  plan                  String         @default("FREE") // "FREE" | "PRO" | "BUSINESS"
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  stripePriceId         String?
+  subscriptionStatus    String?        // "active", "trialing", "past_due", "canceled", etc.
+  currentPeriodEnd      DateTime?
+  cancelAtPeriodEnd     Boolean        @default(false)
   alertRules            AlertRule[]
   cloudAccounts         CloudAccount[]
   costRecords           CostRecord[]
   invitations           Invitation[]
   memberships           Membership[]
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
 }
 
 model Membership {

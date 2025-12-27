@@ -28,7 +28,11 @@ export default function InviteForm({ organizationId }: { organizationId: string 
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'Failed to create invitation')
+        if (data.code === 'LIMIT_REACHED') {
+          setError(`${data.error} Please upgrade your plan to add more team members.`)
+        } else {
+          setError(data.error || 'Failed to create invitation')
+        }
         return
       }
 

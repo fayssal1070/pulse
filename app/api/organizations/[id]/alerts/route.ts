@@ -57,6 +57,23 @@ export async function POST(
       )
     }
 
+    // Check entitlements
+    try {
+      const { assertCanCreateAlert } = await import('@/lib/entitlements')
+      await assertCanCreateAlert(id)
+    } catch (error: any) {
+      if (error.message?.includes('LIMIT_REACHED')) {
+        return NextResponse.json(
+          {
+            error: error.message,
+            code: 'LIMIT_REACHED',
+          },
+          { status: 402 }
+        )
+      }
+      throw error
+    }
+
     const body = await request.json()
     const {
       name,
