@@ -251,7 +251,13 @@ export default async function DashboardPage({
   return (
     <ErrorBoundary>
       <HydrationErrorDetector />
-      <AppShell organizations={organizations} activeOrgId={activeOrg?.id || null} hasActiveAWS={hasActiveAWS}>
+      <AppShell 
+        organizations={organizations} 
+        activeOrgId={activeOrg?.id || null} 
+        hasActiveAWS={hasActiveAWS}
+        commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
+        env={process.env.VERCEL_ENV}
+      >
         {showAdminError && (
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
             <div className="flex">

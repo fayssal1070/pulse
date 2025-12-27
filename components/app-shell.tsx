@@ -6,6 +6,7 @@ import Link from 'next/link'
 import OrgSwitcher from './org-switcher'
 import LogoutButton from './logout-button'
 import SyncNowButton from './sync-now-button'
+import BuildInfoBadge from './build-info-badge'
 
 type Organization = {
   id: string
@@ -19,6 +20,8 @@ interface AppShellProps {
   organizations: Organization[]
   activeOrgId: string | null
   hasActiveAWS?: boolean
+  commitSha?: string
+  env?: string
 }
 
 const navigation = [
@@ -29,7 +32,7 @@ const navigation = [
   { name: 'Team', href: '/team', icon: '👥' },
 ]
 
-export default function AppShell({ children, organizations, activeOrgId, hasActiveAWS = false }: AppShellProps) {
+export default function AppShell({ children, organizations, activeOrgId, hasActiveAWS = false, commitSha, env }: AppShellProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -62,6 +65,7 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
             </Link>
           </div>
           <div className="flex items-center space-x-2">
+            <BuildInfoBadge commitSha={commitSha} env={env} />
             {hasActiveAWS && <SyncNowButton />}
             <LogoutButton />
           </div>
@@ -138,10 +142,14 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-col flex-grow bg-white border-r border-gray-200">
-          <div className="flex items-center px-4 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
             <Link href="/dashboard" className="text-xl font-bold text-gray-900">
               PULSE
             </Link>
+          </div>
+          {/* Build info badge - always visible */}
+          <div className="px-4 pb-2 border-b border-gray-200">
+            <BuildInfoBadge commitSha={commitSha} env={env} />
           </div>
           <div className="flex-1 overflow-y-auto">
             <div className="px-4 py-4 border-b border-gray-200">
@@ -197,6 +205,7 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
               {hasActiveAWS && <SyncNowButton />}
             </div>
             <div className="flex items-center space-x-4">
+              <BuildInfoBadge commitSha={commitSha} env={env} />
               <Link href="/notifications" className="text-gray-700 hover:text-gray-900 relative">
                 🔔
               </Link>

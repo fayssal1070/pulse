@@ -17,7 +17,13 @@ export default async function NewAlertPage() {
   const hasActiveAWS = false
 
   return (
-    <AppShell organizations={organizations} activeOrgId={activeOrg?.id || null} hasActiveAWS={hasActiveAWS}>
+    <AppShell 
+      organizations={organizations} 
+      activeOrgId={activeOrg?.id || null} 
+      hasActiveAWS={hasActiveAWS}
+      commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
+      env={process.env.VERCEL_ENV}
+    >
       <div className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-6">
