@@ -29,18 +29,23 @@
 
 ---
 
-## PR3: AI Gateway + SDK
+## PR3: AI Gateway + SDK ✅
 **Fichiers créés:**
-- `lib/ai/gateway.ts` (proxy + policy enforcement)
-- `lib/ai/pricing.ts` (estimation coûts LLM)
-- `app/api/ai/gateway/route.ts` (endpoint gateway)
-- `packages/pulse-sdk/src/index.ts` (SDK JS minimal)
-- `packages/pulse-sdk/package.json`
+- `lib/ai/gateway.ts` (proxy + policy enforcement + logging)
+- `lib/ai/pricing.ts` (estimation coûts LLM - table pricing)
+- `lib/ai/policy.ts` (policy enforcement: allow/block models, cost/token limits)
+- `lib/ai/sdk.ts` (SDK interne server-side)
+- `app/api/ai/request/route.ts` (POST endpoint unique)
+- `app/api/ai/keys/route.ts` (GET/POST - admin only)
+- `app/api/ai/keys/[id]/route.ts` (DELETE - admin only)
+- `app/api/ai/policies/route.ts` (GET/POST - admin only)
+- `app/admin/ai/page.tsx` (page admin minimale)
+- `components/ai-admin-panel.tsx` (UI admin: keys/policies/test)
 
 **Fichiers modifiés:**
-- `prisma/schema.prisma` (si besoin ajustements)
+- `prisma/schema.prisma` (déjà OK: AiGatewayKey, AiPolicy, AiRequestLog)
 
-**Objectif:** Gateway HTTP + SDK qui logue AiRequestLog + crée CostEvents AI
+**Objectif:** Gateway HTTP + SDK qui logue AiRequestLog + crée CostEvents AI avec multi-tenant strict
 
 ---
 
