@@ -15,8 +15,20 @@ export default function UIDebugPanel({ commitSha, env, isAdmin }: UIDebugPanelPr
     sidebarInDom: boolean
     appShellMounted: boolean
   } | null>(null)
+  const [showDiagnostic, setShowDiagnostic] = useState(false)
 
-  const uiDebugEnabled = process.env.NEXT_PUBLIC_UI_DEBUG === 'true'
+  // Check env var - must be exactly 'true' (string)
+  const uiDebugEnv = process.env.NEXT_PUBLIC_UI_DEBUG
+  const uiDebugEnabled = uiDebugEnv === 'true'
+
+  // Diagnostic: show why panel is hidden (only for admins)
+  useEffect(() => {
+    if (isAdmin && !uiDebugEnabled) {
+      // Show diagnostic after a delay to avoid flicker
+      const timer = setTimeout(() => setShowDiagnostic(true), 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [isAdmin, uiDebugEnabled])
 
   useEffect(() => {
     if (!uiDebugEnabled || !isAdmin) {
@@ -43,6 +55,32 @@ export default function UIDebugPanel({ commitSha, env, isAdmin }: UIDebugPanelPr
     window.addEventListener('resize', updateDebug)
     return () => window.removeEventListener('resize', updateDebug)
   }, [uiDebugEnabled, isAdmin])
+
+  // Diagnostic panel for admins when debug is disabled
+  if (isAdmin && !uiDebugEnabled && showDiagnostic) {
+    return (
+      <div className="fixed bottom-4 right-4 z-50 bg-yellow-900 text-yellow-100 text-xs font-mono px-4 py-3 rounded-lg shadow-xl border border-yellow-700 max-w-sm">
+        <div className="mb-2 text-yellow-300 font-bold border-b border-yellow-700 pb-1">
+          ⚠️ Debug Panel Disabled
+        </div>
+        <div className="space-y-1.5 text-xs">
+          <div>
+            <span className="text-yellow-400">NEXT_PUBLIC_UI_DEBUG:</span>{' '}
+            <span className="text-yellow-200 font-semibold">
+              {uiDebugEnv || '(not set)'}
+            </span>
+          </div>
+          <div>
+            <span className="text-yellow-400">isAdmin:</span>{' '}
+            <span className="text-green-400 font-semibold">{String(isAdmin)}</span>
+          </div>
+          <div className="mt-2 pt-2 border-t border-yellow-700 text-yellow-300 text-xs">
+            💡 Set <code className="bg-yellow-800 px-1 rounded">NEXT_PUBLIC_UI_DEBUG="true"</code> in Vercel to enable
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!uiDebugEnabled || !isAdmin) {
     return null
