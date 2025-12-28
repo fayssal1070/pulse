@@ -64,8 +64,19 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result)
   } catch (error: any) {
-    console.error('AI request error:', error)
-    return NextResponse.json({ error: error.message || 'AI request failed' }, { status: 500 })
+    // Log error without exposing API keys
+    const errorMessage = error.message || 'AI request failed'
+    const sanitizedError = errorMessage
+      .replace(/sk-[a-zA-Z0-9]+/g, '[REDACTED]')
+      .replace(/OPENAI_API_KEY/g, '[API_KEY]')
+    console.error('AI request error:', sanitizedError)
+    
+    // Return user-friendly error
+    const userError = errorMessage.includes('OPENAI_API_KEY')
+      ? 'AI Gateway is not configured. Please contact your administrator.'
+      : sanitizedError
+    
+    return NextResponse.json({ error: userError }, { status: 500 })
   }
 }
 

@@ -59,7 +59,7 @@ async function callOpenAI(
 }> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    throw new Error('OPENAI_API_KEY not configured')
+    throw new Error('OPENAI_API_KEY environment variable is not configured. Please set it in Vercel environment variables.')
   }
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -250,6 +250,12 @@ export async function processAiRequest(
         unit: 'TOKENS',
         costCategory: 'AI',
         dimensions: Object.keys(dimensions).length > 0 ? dimensions : undefined,
+        rawRef: {
+          requestId: apiResponse.requestId,
+          inputTokens: apiResponse.inputTokens,
+          outputTokens: apiResponse.outputTokens,
+          totalTokens: apiResponse.totalTokens,
+        },
         uniqueHash,
         ingestionBatchId: null,
       },
@@ -268,7 +274,14 @@ export async function processAiRequest(
   } catch (error: any) {
     const latencyMs = Date.now() - startTime
 
-    // Log error
+    // Log error (never log API keys or sensitive data)
+    const errorMessage = error.message || 'AI request failed'
+    // Sanitize error message to avoid leaking API keys
+    const sanitizedError = errorMessage
+      .replace(/sk-[a-zA-Z0-9]+/g, '[REDACTED]')
+      .replace(/OPENAI_API_KEY/g, '[API_KEY]')
+      .replace(/Bearer\s+[a-zA-Z0-9]+/g, 'Bearer [REDACTED]')
+
     await prisma.aiRequestLog.create({
       data: {
         orgId: input.orgId,
@@ -282,17 +295,22 @@ export async function processAiRequest(
         promptHash: hashPrompt(
           input.messages?.map((m) => m.content).join('\n') || input.prompt || ''
         ),
-        statusCode: 500,
+        statusCode: errorMessage.includes('OPENAI_API_KEY') ? 503 : 500,
         estimatedCostEur: 0,
         rawRef: {
-          error: error.message,
+          error: sanitizedError,
         },
       },
     })
 
+    // Return user-friendly error (never expose API keys)
+    const userError = errorMessage.includes('OPENAI_API_KEY')
+      ? 'AI Gateway is not configured. Please contact your administrator.'
+      : sanitizedError
+
     return {
       success: false,
-      error: error.message || 'AI request failed',
+      error: userError,
     }
   }
 }
