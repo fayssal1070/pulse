@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import OrgSwitcher from './org-switcher'
 import LogoutButton from './logout-button'
-import SyncNowButton from './sync-now-button'
 import BuildInfoBadge from './build-info-badge'
 
 type Organization = {
@@ -69,7 +68,6 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
           </div>
           <div className="flex items-center space-x-2">
             {showBuildInfo && <BuildInfoBadge commitSha={commitSha} env={env} />}
-            {hasActiveAWS && <SyncNowButton />}
             <LogoutButton />
           </div>
         </div>
@@ -190,14 +188,9 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
               )}
             </nav>
           </div>
-          <div className="p-4 border-t border-gray-200">
-            {hasActiveAWS && (
-              <div className="mb-3">
-                <SyncNowButton />
-              </div>
-            )}
-            <LogoutButton />
-          </div>
+                 <div className="p-4 border-t border-gray-200">
+                   <LogoutButton />
+                 </div>
         </div>
       </div>
 
@@ -207,7 +200,7 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
         <div className="hidden lg:block bg-white shadow">
           <div className="flex items-center justify-between px-6 py-4">
             <div className="flex items-center space-x-4">
-              {hasActiveAWS && <SyncNowButton />}
+              {/* Sync Now removed - use /accounts page instead */}
             </div>
             <div className="flex items-center space-x-4">
               {showBuildInfo && <BuildInfoBadge commitSha={commitSha} env={env} />}
