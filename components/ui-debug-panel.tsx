@@ -59,7 +59,7 @@ export default function UIDebugPanel({ commitSha, env, isAdmin }: UIDebugPanelPr
   // Diagnostic panel for admins when debug is disabled
   if (isAdmin && !uiDebugEnabled && showDiagnostic) {
     return (
-      <div className="fixed bottom-4 right-4 z-50 bg-yellow-900 text-yellow-100 text-xs font-mono px-4 py-3 rounded-lg shadow-xl border border-yellow-700 max-w-sm">
+      <div className="fixed bottom-4 left-4 lg:left-72 z-40 bg-yellow-900 text-yellow-100 text-xs font-mono px-4 py-3 rounded-lg shadow-xl border border-yellow-700 max-w-sm">
         <div className="mb-2 text-yellow-300 font-bold border-b border-yellow-700 pb-1">
           ⚠️ Debug Panel Disabled
         </div>
@@ -88,14 +88,14 @@ export default function UIDebugPanel({ commitSha, env, isAdmin }: UIDebugPanelPr
 
   if (!debugInfo) {
     return (
-      <div className="fixed bottom-4 right-4 z-50 bg-gray-800 text-white text-xs font-mono px-3 py-2 rounded-lg shadow-lg border border-gray-600">
+      <div className="fixed bottom-4 left-4 lg:left-72 z-40 bg-gray-800 text-white text-xs font-mono px-3 py-2 rounded-lg shadow-lg border border-gray-600">
         <div className="text-yellow-400">UI Debug: Loading...</div>
       </div>
     )
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 bg-gray-900 text-white text-xs font-mono px-4 py-3 rounded-lg shadow-xl border border-gray-700 max-w-sm">
+    <div className="fixed bottom-4 left-4 lg:left-72 z-40 bg-gray-900 text-white text-xs font-mono px-4 py-3 rounded-lg shadow-xl border border-gray-700 max-w-sm">
       <div className="mb-2 text-yellow-400 font-bold border-b border-gray-700 pb-1">
         🔧 Debug Panel (Admin Only)
       </div>
