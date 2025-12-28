@@ -59,23 +59,23 @@ export default function UIDebugPanel({ commitSha, env, isAdmin }: UIDebugPanelPr
   // Diagnostic panel for admins when debug is disabled
   if (isAdmin && !uiDebugEnabled && showDiagnostic) {
     return (
-      <div className="fixed bottom-4 left-4 lg:left-72 z-40 bg-yellow-900 text-yellow-100 text-xs font-mono px-4 py-3 rounded-lg shadow-xl border border-yellow-700 max-w-sm">
-        <div className="mb-2 text-yellow-300 font-bold border-b border-yellow-700 pb-1">
-          ⚠️ Debug Panel Disabled
+      <div className="fixed bottom-2 left-2 lg:left-72 z-40 bg-yellow-900 text-yellow-100 text-[10px] font-mono px-2 py-1.5 rounded shadow-xl border border-yellow-700 max-w-[240px]">
+        <div className="mb-1 text-yellow-300 font-semibold border-b border-yellow-700 pb-0.5 text-[10px]">
+          ⚠️ Debug Disabled
         </div>
-        <div className="space-y-1.5 text-xs">
+        <div className="space-y-0.5 text-[10px]">
           <div>
-            <span className="text-yellow-400">NEXT_PUBLIC_UI_DEBUG:</span>{' '}
+            <span className="text-yellow-400">ENV:</span>{' '}
             <span className="text-yellow-200 font-semibold">
               {uiDebugEnv || '(not set)'}
             </span>
           </div>
           <div>
-            <span className="text-yellow-400">isAdmin:</span>{' '}
+            <span className="text-yellow-400">Admin:</span>{' '}
             <span className="text-green-400 font-semibold">{String(isAdmin)}</span>
           </div>
-          <div className="mt-2 pt-2 border-t border-yellow-700 text-yellow-300 text-xs">
-            💡 Set <code className="bg-yellow-800 px-1 rounded">NEXT_PUBLIC_UI_DEBUG="true"</code> in Vercel to enable
+          <div className="mt-1 pt-1 border-t border-yellow-700 text-yellow-300 text-[9px]">
+            Set NEXT_PUBLIC_UI_DEBUG="true"
           </div>
         </div>
       </div>
@@ -88,21 +88,21 @@ export default function UIDebugPanel({ commitSha, env, isAdmin }: UIDebugPanelPr
 
   if (!debugInfo) {
     return (
-      <div className="fixed bottom-4 left-4 lg:left-72 z-40 bg-gray-800 text-white text-xs font-mono px-3 py-2 rounded-lg shadow-lg border border-gray-600">
-        <div className="text-yellow-400">UI Debug: Loading...</div>
+      <div className="fixed bottom-2 left-2 lg:left-72 z-40 bg-gray-800 text-white text-[10px] font-mono px-2 py-1 rounded shadow-lg border border-gray-600">
+        <div className="text-yellow-400">Loading...</div>
       </div>
     )
   }
 
   return (
-    <div className="fixed bottom-4 left-4 lg:left-72 z-40 bg-gray-900 text-white text-xs font-mono px-4 py-3 rounded-lg shadow-xl border border-gray-700 max-w-sm">
-      <div className="mb-2 text-yellow-400 font-bold border-b border-gray-700 pb-1">
-        🔧 Debug Panel (Admin Only)
+    <div className="fixed bottom-2 left-2 lg:left-72 z-40 bg-gray-900 text-white text-[10px] font-mono px-2 py-1.5 rounded shadow-xl border border-gray-700 max-w-[240px]">
+      <div className="mb-1 text-yellow-400 font-semibold border-b border-gray-700 pb-0.5 text-[10px]">
+        🔧 Debug
       </div>
-      <div className="space-y-1.5">
+      <div className="space-y-0.5 text-[10px]">
         {commitSha && (
           <div>
-            <span className="text-gray-400">Commit:</span>{' '}
+            <span className="text-gray-400">SHA:</span>{' '}
             <span className="text-blue-400 font-semibold">{commitSha.substring(0, 7)}</span>
           </div>
         )}
@@ -113,31 +113,31 @@ export default function UIDebugPanel({ commitSha, env, isAdmin }: UIDebugPanelPr
           </div>
         )}
         <div>
-          <span className="text-gray-400">Window:</span>{' '}
+          <span className="text-gray-400">W:</span>{' '}
           <span className="text-green-400 font-semibold">{debugInfo.windowWidth}px</span>
         </div>
         <div>
-          <span className="text-gray-400">isLg:</span>{' '}
+          <span className="text-gray-400">Lg:</span>{' '}
           <span className={debugInfo.isLg ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>
             {String(debugInfo.isLg)}
           </span>
         </div>
         <div>
-          <span className="text-gray-400">Sidebar in DOM:</span>{' '}
+          <span className="text-gray-400">Sidebar:</span>{' '}
           <span className={debugInfo.sidebarInDom ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>
-            {String(debugInfo.sidebarInDom)}
+            {debugInfo.sidebarInDom ? '✓' : '✗'}
           </span>
         </div>
         <div>
-          <span className="text-gray-400">AppShell:</span>{' '}
+          <span className="text-gray-400">Shell:</span>{' '}
           <span className={debugInfo.appShellMounted ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>
-            {debugInfo.appShellMounted ? 'MOUNTED' : 'NOT MOUNTED'}
+            {debugInfo.appShellMounted ? '✓' : '✗'}
           </span>
         </div>
       </div>
       {debugInfo.isLg && !debugInfo.sidebarInDom && (
-        <div className="mt-2 pt-2 border-t border-gray-700 text-red-400 text-xs">
-          ⚠️ Sidebar should be visible on desktop
+        <div className="mt-1 pt-1 border-t border-gray-700 text-red-400 text-[9px]">
+          ⚠️ Sidebar missing
         </div>
       )}
     </div>
