@@ -27,17 +27,33 @@ model Organization {
   stripeCustomerId      String?
   stripeSubscriptionId  String?
   stripePriceId         String?
-  subscriptionStatus    String?        // "active", "trialing", "past_due", "canceled", etc.
+  subscriptionStatus    String? // "active", "trialing", "past_due", "canceled", etc.
   currentPeriodEnd      DateTime?
   cancelAtPeriodEnd     Boolean        @default(false)
+  // AWS CUR configuration
+  awsCurEnabled         Boolean        @default(false)
+  awsCurBucket          String?
+  awsCurPrefix          String?
+  awsCurRegion          String?
+  awsPayerAccountId     String?
+  awsAssumeRoleArn      String? // Cross-account role ARN
+  // AI Gateway configuration
+  aiGatewayEnabled      Boolean        @default(false)
   alertRules            AlertRule[]
   cloudAccounts         CloudAccount[]
   costRecords           CostRecord[]
+  costEvents            CostEvent[]
+  budgets               Budget[]
+  aiGatewayKeys         AiGatewayKey[]
+  aiPolicies            AiPolicy[]
+  aiRequestLogs         AiRequestLog[]
   invitations           Invitation[]
   memberships           Membership[]
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
+  @@index([awsCurEnabled])
+  @@index([aiGatewayEnabled])
 }
 
 model Membership {
@@ -157,13 +173,17 @@ model CloudAccount {
   provider          String
   accountName       String
   accountIdentifier String?
-  connectionType    String? // e.g., "COST_EXPLORER", "CSV", "MANUAL"
+  connectionType    String? // e.g., "COST_EXPLORER", "CSV", "MANUAL", "CUR"
   roleArn           String? // AWS Role ARN for AssumeRole
   externalId        String? // AWS External ID for AssumeRole
   status            String       @default("pending") // "pending", "active", "error", "disabled"
   lastSyncedAt      DateTime?
   lastSyncError     String?
   notes             String?
+  // CUR-specific fields
+  curBucket         String? // Override org-level CUR bucket
+  curPrefix         String? // Override org-level CUR prefix
+  curRegion         String? // Override org-level CUR region
   createdAt         DateTime     @default(now())
   organization      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -177,4 +197,123 @@ model JobLock {
   lockedUntil DateTime
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// Unified CostEvent model - source of truth for all costs (AWS + AI)
+model CostEvent {
+  id               String       @id @default(cuid())
+  orgId            String
+  source           String // "AWS" | "AI"
+  occurredAt       DateTime // Timestamp of the cost event
+  amountEur        Decimal      @db.Decimal(12, 4)
+  amountUsd        Decimal?     @db.Decimal(12, 4)
+  currency         String       @default("EUR")
+  provider         String // "aws" | "openai" | "anthropic" | "google" | etc.
+  resourceType     String // AWS service name or "LLM_CALL"
+  service          String // e.g., "EC2", "S3", "RDS" or "OpenAI", "Anthropic"
+  usageType        String? // CUR usage type or "tokens"
+  quantity         Decimal?     @db.Decimal(15, 6) // tokens or usage quantity
+  unit             String? // "Hrs", "GB-Mo", "TOKENS", etc.
+  costCategory     String? // "Compute", "Storage", "AI", "Network", etc.
+  dimensions       Json? // { userId, teamId, projectId, appId, clientId, model, taskType }
+  tags             Json? // AWS tags or custom tags
+  rawRef           Json? // CUR line identifiers or AI requestId
+  ingestionBatchId String? // For batch tracking
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  organization     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, occurredAt, rawRef(path: "$.lineItemId")]) // Dedup key for AWS CUR
+  @@index([orgId])
+  @@index([orgId, occurredAt])
+  @@index([orgId, source])
+  @@index([orgId, source, occurredAt])
+  @@index([orgId, provider])
+  @@index([ingestionBatchId])
+}
+
+// Budget model - supports org/team/project/app/client scopes
+model Budget {
+  id                String       @id @default(cuid())
+  orgId             String
+  name              String
+  scopeType         String // "ORG" | "TEAM" | "PROJECT" | "APP" | "CLIENT"
+  scopeId           String? // ID of team/project/app/client (null for ORG)
+  period            String       @default("MONTHLY") // "MONTHLY" | "DAILY"
+  amountEur         Decimal      @db.Decimal(12, 4)
+  alertThresholdPct Int          @default(80) // Alert at X% of budget
+  hardLimit         Boolean      @default(false) // If true, block/restrict when exceeded
+  actions           Json? // { recommend: boolean, block: boolean, downgradeModel: string }
+  enabled           Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  organization      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([orgId, scopeType, scopeId])
+  @@index([orgId, enabled])
+}
+
+// AI Gateway API Keys
+model AiGatewayKey {
+  id              String       @id @default(cuid())
+  orgId           String
+  keyHash         String       @unique // SHA-256 hash of the API key
+  keyPrefix       String // First 8 chars for display
+  status          String       @default("active") // "active" | "revoked"
+  createdByUserId String
+  createdAt       DateTime     @default(now())
+  revokedAt       DateTime?
+  organization    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([keyHash])
+  @@index([orgId, status])
+}
+
+// AI Gateway Policies
+model AiPolicy {
+  id               String       @id @default(cuid())
+  orgId            String
+  name             String
+  allowedModels    Json? // Array of allowed model identifiers
+  blockedModels    Json? // Array of blocked model identifiers
+  maxCostPerDayEur Decimal?     @db.Decimal(12, 4)
+  maxTokensPerReq  Int?
+  enabled          Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  organization     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([orgId, enabled])
+}
+
+// AI Request Logs (audit trail)
+model AiRequestLog {
+  id               String       @id @default(cuid())
+  orgId            String
+  occurredAt       DateTime     @default(now())
+  userId           String?
+  teamId           String?
+  projectId        String?
+  appId            String?
+  clientId         String?
+  provider         String // "openai", "anthropic", "google", etc.
+  model            String // Model identifier
+  promptHash       String? // SHA-256 hash of prompt (not raw prompt)
+  inputTokens      Int?
+  outputTokens     Int?
+  totalTokens      Int?
+  estimatedCostEur Decimal?     @db.Decimal(12, 4)
+  latencyMs        Int?
+  statusCode       Int?
+  rawRef           Json? // Provider request ID and metadata
+  organization     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([orgId, occurredAt])
+  @@index([orgId, provider, model])
+  @@index([orgId, userId])
+  @@index([orgId, projectId])
 }
