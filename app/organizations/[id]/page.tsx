@@ -51,25 +51,27 @@ export default async function OrganizationPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const user = await requireAuth()
-  const { id } = await params
-  const organization = await getOrganizationById(id, user.id)
+  try {
+    const user = await requireAuth()
+    const { id } = await params
+    const organization = await getOrganizationById(id, user.id)
 
-  if (!organization) {
-    redirect('/dashboard')
-  }
+    if (!organization) {
+      redirect('/dashboard')
+    }
 
-  const costs7Days = await getCosts(id, 7)
-  const costs30Days = await getCosts(id, 30)
-  const topServices = await getTopServices(id, 30)
+    const [costs7Days, costs30Days, topServices, alerts] = await Promise.all([
+      getCosts(id, 7),
+      getCosts(id, 30),
+      getTopServices(id, 30),
+      prisma.alertRule.findMany({
+        where: { orgId: id },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ])
 
-  const total7Days = costs7Days.reduce((sum: number, cost: Cost) => sum + cost.amountEUR, 0)
-  const total30Days = costs30Days.reduce((sum: number, cost: Cost) => sum + cost.amountEUR, 0)
-
-  const alerts = await prisma.alertRule.findMany({
-    where: { orgId: id },
-    orderBy: { createdAt: 'desc' },
-  })
+    const total7Days = costs7Days.reduce((sum: number, cost: Cost) => sum + cost.amountEUR, 0)
+    const total30Days = costs30Days.reduce((sum: number, cost: Cost) => sum + cost.amountEUR, 0)
 
   type Alert = typeof alerts[0]
 
@@ -210,5 +212,9 @@ export default async function OrganizationPage({
       </main>
     </div>
   )
+  } catch (error) {
+    console.error('Organization page error:', error)
+    redirect('/dashboard')
+  }
 }
 
