@@ -1,8 +1,11 @@
 import { redirect } from 'next/navigation'
 import { requireAuth } from '@/lib/auth-helpers'
-import { getOrganizationById } from '@/lib/organizations'
+import { getOrganizationById, getUserOrganizations } from '@/lib/organizations'
+import { getActiveOrganization } from '@/lib/active-org'
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
+import AppShell from '@/components/app-shell'
+import { isAdmin } from '@/lib/admin-helpers'
 
 async function getCosts(organizationId: string, days: number) {
   const startDate = new Date()
@@ -60,6 +63,11 @@ export default async function OrganizationPage({
       redirect('/dashboard')
     }
 
+    const organizations = await getUserOrganizations(user.id)
+    const activeOrg = await getActiveOrganization(user.id)
+    const isAdminUser = await isAdmin()
+    const uiDebugEnabled = process.env.NEXT_PUBLIC_UI_DEBUG === 'true' && isAdminUser
+
     const [costs7Days, costs30Days, topServices, alerts] = await Promise.all([
       getCosts(id, 7),
       getCosts(id, 30),
@@ -75,30 +83,24 @@ export default async function OrganizationPage({
 
   type Alert = typeof alerts[0]
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Link href="/dashboard" className="text-2xl font-bold text-gray-900">
-                PULSE
-              </Link>
-              <span className="text-gray-400">/</span>
-              <span className="text-gray-700">{organization.name}</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/api/auth/logout"
-                className="text-gray-700 hover:text-gray-900"
-              >
-                Logout
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+  // Check if org has AWS accounts
+  const hasActiveAWS = await prisma.cloudAccount.count({
+    where: {
+      orgId: id,
+      provider: 'AWS',
+      status: 'active',
+    },
+  }) > 0
 
+  return (
+    <AppShell
+      organizations={organizations}
+      activeOrgId={activeOrg?.id || null}
+      hasActiveAWS={hasActiveAWS}
+      commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
+      env={process.env.VERCEL_ENV}
+      isAdmin={isAdminUser}
+    >
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-6 flex justify-between items-center">
@@ -210,7 +212,7 @@ export default async function OrganizationPage({
           </div>
         </div>
       </main>
-    </div>
+    </AppShell>
   )
   } catch (error) {
     console.error('Organization page error:', error)

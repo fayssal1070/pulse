@@ -1,9 +1,12 @@
 import { redirect } from 'next/navigation'
 import { requireAuth } from '@/lib/auth-helpers'
-import { getOrganizationById, isOrganizationOwner } from '@/lib/organizations'
+import { getOrganizationById, isOrganizationOwner, getUserOrganizations } from '@/lib/organizations'
+import { getActiveOrganization } from '@/lib/active-org'
 import { prisma } from '@/lib/prisma'
 import { getOrgUsage } from '@/lib/entitlements'
 import Link from 'next/link'
+import AppShell from '@/components/app-shell'
+import { isAdmin } from '@/lib/admin-helpers'
 import BillingActions from './billing-actions'
 import EntitlementsTable from './entitlements-table'
 
@@ -30,6 +33,18 @@ export default async function BillingPage({
 
   // Get usage and entitlements
   const usage = await getOrgUsage(id)
+
+  const organizations = await getUserOrganizations(user.id)
+  const activeOrg = await getActiveOrganization(user.id)
+  const isAdminUser = await isAdmin()
+
+  const hasActiveAWS = await prisma.cloudAccount.count({
+    where: {
+      orgId: id,
+      provider: 'AWS',
+      status: 'active',
+    },
+  }) > 0
 
   // Format dates
   const formatDate = (date: Date | null) => {
@@ -62,28 +77,14 @@ export default async function BillingPage({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Link href="/dashboard" className="text-2xl font-bold text-gray-900">
-                PULSE
-              </Link>
-              <span className="text-gray-400">/</span>
-              <Link
-                href={`/organizations/${id}`}
-                className="text-gray-700 hover:text-gray-900"
-              >
-                {organization.name}
-              </Link>
-              <span className="text-gray-400">/</span>
-              <span className="text-gray-700">Billing</span>
-            </div>
-          </div>
-        </div>
-      </nav>
-
+    <AppShell
+      organizations={organizations}
+      activeOrgId={activeOrg?.id || null}
+      hasActiveAWS={hasActiveAWS}
+      commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
+      env={process.env.VERCEL_ENV}
+      isAdmin={isAdminUser}
+    >
       <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-6">
@@ -162,7 +163,7 @@ export default async function BillingPage({
           <EntitlementsTable usage={usage} />
         </div>
       </main>
-    </div>
+    </AppShell>
   )
 }
 

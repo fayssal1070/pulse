@@ -1,8 +1,11 @@
 import { redirect } from 'next/navigation'
 import { requireAuth } from '@/lib/auth-helpers'
-import { getOrganizationById } from '@/lib/organizations'
+import { getOrganizationById, getUserOrganizations } from '@/lib/organizations'
+import { getActiveOrganization } from '@/lib/active-org'
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
+import AppShell from '@/components/app-shell'
+import { isAdmin } from '@/lib/admin-helpers'
 import CloudAccountSyncButton from '@/components/cloud-account-sync-button'
 
 export default async function CloudAccountsPage({
@@ -38,35 +41,27 @@ export default async function CloudAccountsPage({
     return date.toLocaleDateString()
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Link href="/dashboard" className="text-2xl font-bold text-gray-900">
-                PULSE
-              </Link>
-              <span className="text-gray-400">/</span>
-              <Link
-                href={`/organizations/${id}`}
-                className="text-gray-700 hover:text-gray-900"
-              >
-                {organization.name}
-              </Link>
-              <span className="text-gray-400">/</span>
-              <span className="text-gray-700">Cloud Accounts</span>
-            </div>
-            <Link
-              href={`/organizations/${id}`}
-              className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-            >
-              Back
-            </Link>
-          </div>
-        </div>
-      </nav>
+  const organizations = await getUserOrganizations(user.id)
+  const activeOrg = await getActiveOrganization(user.id)
+  const isAdminUser = await isAdmin()
 
+  const hasActiveAWS = await prisma.cloudAccount.count({
+    where: {
+      orgId: id,
+      provider: 'AWS',
+      status: 'active',
+    },
+  }) > 0
+
+  return (
+    <AppShell
+      organizations={organizations}
+      activeOrgId={activeOrg?.id || null}
+      hasActiveAWS={hasActiveAWS}
+      commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
+      env={process.env.VERCEL_ENV}
+      isAdmin={isAdminUser}
+    >
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="mb-6 flex justify-between items-center">
@@ -201,7 +196,7 @@ export default async function CloudAccountsPage({
           )}
         </div>
       </main>
-    </div>
+    </AppShell>
   )
 }
 
