@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { requireAuth } from '@/lib/auth-helpers'
 import { canViewBilling } from '@/lib/auth/rbac'
-import { redirect } from 'next/navigation'
 import { getOrganizationById, isOrganizationOwner, getUserOrganizations } from '@/lib/organizations'
 import { getActiveOrganization } from '@/lib/active-org'
 import { prisma } from '@/lib/prisma'
@@ -26,6 +25,12 @@ export default async function BillingPage({
 
   if (!organization) {
     redirect('/dashboard')
+  }
+
+  // Check RBAC: admin and finance can view billing
+  const canView = await canViewBilling(id)
+  if (!canView) {
+    redirect('/dashboard?error=access_denied')
   }
 
   const isOwner = await isOrganizationOwner(id, user.id)
@@ -168,6 +173,3 @@ export default async function BillingPage({
     </AppShell>
   )
 }
-
-
-

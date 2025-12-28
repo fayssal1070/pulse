@@ -1,9 +1,7 @@
 import { requireAuth } from '@/lib/auth-helpers'
-import { getActiveOrganization } from '@/lib/active-org'
-import { canCreateAlerts } from '@/lib/auth/rbac'
-import { redirect } from 'next/navigation'
 import { getUserOrganizations } from '@/lib/organizations'
 import { getActiveOrganization } from '@/lib/active-org'
+import { canCreateAlerts } from '@/lib/auth/rbac'
 import { redirect } from 'next/navigation'
 import AppShell from '@/components/app-shell'
 import NewAlertFormGlobal from './new-alert-form-global'
@@ -17,6 +15,16 @@ export default async function NewAlertPage() {
 
   if (organizations.length === 0) {
     redirect('/organizations/new')
+  }
+
+  if (!activeOrg) {
+    redirect('/onboarding')
+  }
+
+  // Check RBAC: admin, finance, manager can create alerts
+  const canCreate = await canCreateAlerts(activeOrg.id)
+  if (!canCreate) {
+    redirect('/dashboard?error=access_denied')
   }
 
   const hasActiveAWS = false
@@ -44,4 +52,3 @@ export default async function NewAlertPage() {
     </AppShell>
   )
 }
-
