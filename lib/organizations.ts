@@ -1,39 +1,69 @@
 import { prisma } from './prisma'
 
 export async function getUserOrganizations(userId: string) {
+  // Use select instead of include to avoid errors if new columns don't exist
   const memberships = await prisma.membership.findMany({
     where: { userId },
-    include: {
+    select: {
+      id: true,
+      role: true,
       organization: {
-        include: {
-          memberships: {
-            include: {
-              user: {
-                select: { id: true, email: true },
-              },
-            },
-          },
+        select: {
+          id: true,
+          name: true,
+          createdAt: true,
+          plan: true,
+          // Only select fields that definitely exist (avoid awsCurEnabled if migration not applied)
         },
       },
     },
   })
 
-  return memberships.map((m) => ({
-    id: m.organization.id,
-    name: m.organization.name,
-    createdAt: m.organization.createdAt,
-    role: m.role,
-    plan: m.organization.plan,
-    awsCurEnabled: m.organization.awsCurEnabled,
-    members: m.organization.memberships.map((mem) => ({
-      id: mem.id,
-      userId: mem.userId,
-      orgId: mem.orgId,
-      role: mem.role,
-      user: mem.user,
-    })),
-    owner: m.organization.memberships.find((mem) => mem.role === 'owner')?.user || null,
-  }))
+  // Get memberships separately to avoid include issues
+  const orgIds = memberships.map((m) => m.organization.id)
+  const allMemberships = orgIds.length > 0
+    ? await prisma.membership.findMany({
+        where: { orgId: { in: orgIds } },
+        select: {
+          id: true,
+          userId: true,
+          orgId: true,
+          role: true,
+          user: {
+            select: { id: true, email: true },
+          },
+        },
+      })
+    : []
+
+  // Group memberships by org
+  const membershipsByOrg = allMemberships.reduce((acc, mem) => {
+    if (!acc[mem.orgId]) {
+      acc[mem.orgId] = []
+    }
+    acc[mem.orgId].push(mem)
+    return acc
+  }, {} as Record<string, typeof allMemberships>)
+
+  return memberships.map((m) => {
+    const orgMembers = membershipsByOrg[m.organization.id] || []
+    return {
+      id: m.organization.id,
+      name: m.organization.name,
+      createdAt: m.organization.createdAt,
+      role: m.role,
+      plan: m.organization.plan,
+      awsCurEnabled: false, // Default to false until migration is applied
+      members: orgMembers.map((mem) => ({
+        id: mem.id,
+        userId: mem.userId,
+        orgId: mem.orgId,
+        role: mem.role,
+        user: mem.user,
+      })),
+      owner: orgMembers.find((mem) => mem.role === 'owner')?.user || null,
+    }
+  })
 }
 
 export async function getOrganizationById(organizationId: string, userId: string) {

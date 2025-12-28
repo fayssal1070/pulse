@@ -118,7 +118,7 @@ export default async function AccountsPage() {
               </p>
             </div>
             <div className="flex items-center space-x-3">
-              {activeOrg && !!activeOrg?.awsCurEnabled && isAdminUser && (
+              {activeOrg && isAdminUser && (
                 <SyncCurButton orgId={activeOrg.id} />
               )}
               {activeOrg && (
