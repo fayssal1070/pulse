@@ -6,6 +6,7 @@ import { createHash } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { checkPolicies, type RequestContext } from './policy'
 import { estimateCost, getProviderFromModel } from './pricing'
+import { computeBudgetStatus } from '@/lib/alerts/engine'
 import type { CostEventDimensions } from '@/lib/cost-events/types'
 
 export interface AiRequestInput {
@@ -40,6 +41,89 @@ export interface AiRequestResponse {
  */
 function hashPrompt(prompt: string): string {
   return createHash('sha256').update(prompt).digest('hex')
+}
+
+/**
+ * Check budget enforcement for AI requests
+ */
+async function checkBudgetEnforcement(
+  orgId: string,
+  teamId?: string,
+  projectId?: string,
+  estimatedCost: number = 0
+): Promise<{ allowed: boolean; reason?: string; budgetId?: string }> {
+  try {
+    // Get all enabled budgets with hardLimit=true
+    const budgets = await prisma.budget.findMany({
+      where: {
+        orgId,
+        enabled: true,
+        hardLimit: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        scopeType: true,
+        scopeId: true,
+        period: true,
+        actions: true,
+      },
+    })
+
+    for (const budget of budgets) {
+      // Check if this budget applies to this request
+      let applies = false
+
+      if (budget.scopeType === 'ORG') {
+        applies = true
+      } else if (budget.scopeType === 'TEAM' && budget.scopeId === teamId) {
+        applies = true
+      } else if (budget.scopeType === 'PROJECT' && budget.scopeId === projectId) {
+        applies = true
+      }
+
+      if (!applies) continue
+
+      // Compute budget status
+      const status = await computeBudgetStatus(orgId, budget.id)
+      if (!status) continue
+
+      // If critical and action is block, deny request
+      if (status.status === 'CRITICAL') {
+        const actions = budget.actions as any
+        if (actions?.block === true) {
+          return {
+            allowed: false,
+            reason: `Budget "${budget.name}" exceeded (${status.percentage.toFixed(1)}%). Request blocked.`,
+            budgetId: budget.id,
+          }
+        }
+      }
+
+      // If warning and projected cost would exceed, check restrict action
+      if (status.status === 'WARNING' || status.status === 'CRITICAL') {
+        const projectedSpend = status.currentSpend + estimatedCost
+        const projectedPercentage = (projectedSpend / status.limit) * 100
+
+        if (projectedPercentage >= 100) {
+          const actions = budget.actions as any
+          if (actions?.block === true) {
+            return {
+              allowed: false,
+              reason: `Budget "${budget.name}" would be exceeded (${projectedPercentage.toFixed(1)}%). Request blocked.`,
+              budgetId: budget.id,
+            }
+          }
+        }
+      }
+    }
+
+    return { allowed: true }
+  } catch (error) {
+    console.error('Error checking budget enforcement:', error)
+    // On error, allow request (fail open for MVP)
+    return { allowed: true }
+  }
 }
 
 /**
@@ -133,6 +217,40 @@ export async function processAiRequest(
       inputTokens: estimatedInputTokens,
       outputTokens: estimatedOutputTokens,
       estimatedCost,
+    }
+
+    // Check budget enforcement BEFORE policies
+    const budgetCheck = await checkBudgetEnforcement(input.orgId, input.teamId, input.projectId, estimatedCost)
+    if (!budgetCheck.allowed) {
+      // Log blocked request
+      await prisma.aiRequestLog.create({
+        data: {
+          orgId: input.orgId,
+          userId: input.userId,
+          teamId: input.teamId,
+          projectId: input.projectId,
+          appId: input.appId,
+          clientId: input.clientId,
+          provider: getProviderFromModel(input.model),
+          model: input.model,
+          promptHash: hashPrompt(messages.map((m) => m.content).join('\n')),
+          inputTokens: estimatedInputTokens,
+          outputTokens: 0,
+          totalTokens: estimatedInputTokens,
+          estimatedCostEur: estimatedCost,
+          latencyMs: Date.now() - startTime,
+          statusCode: 403,
+          rawRef: {
+            reason: 'budget_blocked',
+            budgetId: budgetCheck.budgetId,
+          },
+        },
+      })
+
+      return {
+        success: false,
+        error: budgetCheck.reason || 'Budget exceeded. Request blocked.',
+      }
     }
 
     const policyCheck = await checkPolicies(policyContext)

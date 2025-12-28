@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
 import { requireAuth } from '@/lib/auth-helpers'
+import { canViewBilling } from '@/lib/auth/rbac'
+import { redirect } from 'next/navigation'
 import { getOrganizationById, isOrganizationOwner, getUserOrganizations } from '@/lib/organizations'
 import { getActiveOrganization } from '@/lib/active-org'
 import { prisma } from '@/lib/prisma'

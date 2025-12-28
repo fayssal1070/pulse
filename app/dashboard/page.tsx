@@ -55,7 +55,7 @@ export default async function DashboardPage({
   }
 
   // Fetch executive dashboard data
-  const [kpis, dailyTrend, topUsers, topTeams, topProjects, topApps, topClients, budgetAlerts, recommendations] = await Promise.all([
+  const [kpis, dailyTrend, topUsers, topTeams, topProjects, topApps, topClients, recommendations] = await Promise.all([
     getExecutiveKPIs(activeOrgId),
     getDailyTrend(activeOrgId, 30, 'total'),
     getTopConsumers(activeOrgId, 'user', 5),
@@ -63,7 +63,6 @@ export default async function DashboardPage({
     getTopConsumers(activeOrgId, 'project', 5),
     getTopConsumers(activeOrgId, 'app', 5),
     getTopConsumers(activeOrgId, 'client', 5),
-    getActiveBudgetAlerts(activeOrgId),
     getRecommendations(activeOrgId),
   ])
 
@@ -126,7 +125,7 @@ export default async function DashboardPage({
                 apps={topApps}
                 clients={topClients}
               />
-              <AlertsPanel alerts={budgetAlerts} />
+              <AlertsPanel />
             </div>
 
             {/* Recommendations */}

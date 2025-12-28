@@ -1,13 +1,53 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { BudgetAlert } from '@/lib/dashboard/executive'
 
-interface AlertsPanelProps {
-  alerts: BudgetAlert[]
+interface ActiveAlert {
+  id: string
+  budgetId: string
+  budgetName: string
+  scopeType: string
+  scopeId: string | null
+  scopeName: string
+  currentSpend: number
+  limit: number
+  percentage: number
+  status: 'OK' | 'WARNING' | 'CRITICAL'
+  period: 'MONTHLY' | 'DAILY'
 }
 
-export default function AlertsPanel({ alerts }: AlertsPanelProps) {
+interface AlertsPanelProps {
+  initialAlerts?: ActiveAlert[]
+}
+
+export default function AlertsPanel({ initialAlerts = [] }: AlertsPanelProps) {
+  const [alerts, setAlerts] = useState<ActiveAlert[]>(initialAlerts)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    // Fetch active alerts from API
+    const fetchAlerts = async () => {
+      setLoading(true)
+      try {
+        const res = await fetch('/api/alerts/active')
+        if (res.ok) {
+          const data = await res.json()
+          setAlerts(data.alerts || [])
+        }
+      } catch (error) {
+        console.error('Error fetching alerts:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAlerts()
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchAlerts, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -29,7 +69,11 @@ export default function AlertsPanel({ alerts }: AlertsPanelProps) {
         </Link>
       </div>
 
-      {alerts.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-8 text-gray-500">
+          <p>Loading alerts...</p>
+        </div>
+      ) : alerts.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           <p>No active budget alerts</p>
           <p className="text-sm mt-2">All budgets are within limits</p>
@@ -40,7 +84,7 @@ export default function AlertsPanel({ alerts }: AlertsPanelProps) {
             <div
               key={alert.id}
               className={`p-4 rounded-lg border-l-4 ${
-                alert.status === 'EXCEEDED'
+                alert.status === 'CRITICAL'
                   ? 'bg-red-50 border-red-500'
                   : 'bg-yellow-50 border-yellow-500'
               }`}
@@ -49,9 +93,9 @@ export default function AlertsPanel({ alerts }: AlertsPanelProps) {
                 <div className="flex-1">
                   <div className="flex items-center space-x-2">
                     <span className={`text-sm font-semibold ${
-                      alert.status === 'EXCEEDED' ? 'text-red-800' : 'text-yellow-800'
+                      alert.status === 'CRITICAL' ? 'text-red-800' : 'text-yellow-800'
                     }`}>
-                      {alert.status === 'EXCEEDED' ? 'EXCEEDED' : 'WARNING'}
+                      {alert.status === 'CRITICAL' ? 'CRITICAL' : 'WARNING'}
                     </span>
                     <span className="text-xs text-gray-500">
                       {alert.scopeType} • {alert.period}
