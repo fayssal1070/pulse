@@ -12,23 +12,32 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Parse connection string to handle SSL
-const connectionString = process.env.DATABASE_URL
-const url = new URL(connectionString)
+let connectionString = process.env.DATABASE_URL
 
-// Configure SSL for PostgreSQL (Supabase/cloud providers)
-// If connection string already has sslmode, use it; otherwise add require
-const sslConfig: any = {
-  rejectUnauthorized: false, // Accept self-signed certificates (common with Supabase)
+// For Supabase and cloud PostgreSQL providers, ensure SSL is configured
+// Add sslmode=require if not present (Supabase requires SSL)
+try {
+  const url = new URL(connectionString)
+  if (!url.searchParams.has('sslmode')) {
+    url.searchParams.set('sslmode', 'require')
+    connectionString = url.toString()
+  }
+} catch (e) {
+  // If URL parsing fails, connectionString might be in a different format
+  // Try to append sslmode if it's not already there
+  if (!connectionString.includes('sslmode=')) {
+    const separator = connectionString.includes('?') ? '&' : '?'
+    connectionString = `${connectionString}${separator}sslmode=require`
+  }
 }
 
-// If DATABASE_URL has sslmode parameter, respect it
-if (!url.searchParams.has('sslmode')) {
-  url.searchParams.set('sslmode', 'require')
-}
-
+// Configure SSL for PostgreSQL Pool (Supabase/cloud providers)
+// rejectUnauthorized: false accepts self-signed certificates
 const pool = new Pool({
-  connectionString: url.toString(),
-  ssl: sslConfig,
+  connectionString,
+  ssl: {
+    rejectUnauthorized: false, // Accept self-signed certificates (common with Supabase)
+  },
 })
 
 const adapter = new PrismaPg(pool)
