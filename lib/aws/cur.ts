@@ -415,6 +415,7 @@ export async function syncCurForOrg(orgId: string): Promise<CurIngestionResult> 
           status: 'active',
         },
         select: {
+          id: true,
           curBucket: true,
           curPrefix: true,
           curRegion: true,

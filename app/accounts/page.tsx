@@ -60,7 +60,7 @@ export default async function AccountsPage() {
       },
     })
     curStatus = {
-      enabled: activeOrg.awsCurEnabled,
+      enabled: !!activeOrg?.awsCurEnabled,
       lastBatch: latestBatch,
       lastSyncedAt: curAccount?.lastCurSyncAt,
       lastError: curAccount?.lastCurSyncError,
@@ -118,7 +118,7 @@ export default async function AccountsPage() {
               </p>
             </div>
             <div className="flex items-center space-x-3">
-              {activeOrg && activeOrg.awsCurEnabled && isAdminUser && (
+              {activeOrg && !!activeOrg?.awsCurEnabled && isAdminUser && (
                 <SyncCurButton orgId={activeOrg.id} />
               )}
               {activeOrg && (

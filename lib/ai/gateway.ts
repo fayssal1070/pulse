@@ -189,7 +189,11 @@ export async function processAiRequest(
     }
 
     const latencyMs = Date.now() - startTime
-    const finalCost = estimateCost(apiResponse.inputTokens, apiResponse.outputTokens, apiResponse.totalTokens)
+    const finalCost = estimateCost(
+      input.model,
+      apiResponse.inputTokens,
+      apiResponse.outputTokens
+    )
 
     // Create AiRequestLog
     const requestLog = await prisma.aiRequestLog.create({

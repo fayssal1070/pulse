@@ -24,6 +24,7 @@ export async function getUserOrganizations(userId: string) {
     createdAt: m.organization.createdAt,
     role: m.role,
     plan: m.organization.plan,
+    awsCurEnabled: m.organization.awsCurEnabled,
     members: m.organization.memberships.map((mem) => ({
       id: mem.id,
       userId: mem.userId,
