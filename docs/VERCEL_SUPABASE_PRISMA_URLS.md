@@ -50,13 +50,15 @@ postgresql://postgres.abcdefghijklmnop:[PASSWORD]@aws-0-eu-west-1.pooler.supabas
 
 Dans le dashboard Vercel → Project → Settings → Environment Variables, ajouter :
 
-1. **DATABASE_URL** (Production, Preview, Development)
+1. **DATABASE_URL** (Production, Preview, Development) - **OBLIGATOIRE**
    - Valeur: URL avec port 6543 + `?sslmode=require`
    - Exemple: `postgresql://postgres.[ref]:[pass]@aws-0-[region].pooler.supabase.com:6543/postgres?sslmode=require`
+   - Utilisé par Prisma via `prisma.config.ts`
 
-2. **DIRECT_URL** (Production, Preview, Development)
+2. **DIRECT_URL** (Production, Preview, Development) - **OPTIONNEL**
    - Valeur: URL avec port 5432 + `?sslmode=require`
    - Exemple: `postgresql://postgres.[ref]:[pass]@aws-0-[region].pooler.supabase.com:5432/postgres?sslmode=require`
+   - Note: Prisma 7 n'utilise pas `DIRECT_URL` automatiquement, mais peut être utile pour migrations manuelles
 
 ### Où trouver les URLs dans Supabase
 
