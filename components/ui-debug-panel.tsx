@@ -16,6 +16,7 @@ export default function UIDebugPanel({ commitSha, env, isAdmin }: UIDebugPanelPr
     appShellMounted: boolean
   } | null>(null)
   const [showDiagnostic, setShowDiagnostic] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   // Check env var - must be exactly 'true' (string)
   const uiDebugEnv = process.env.NEXT_PUBLIC_UI_DEBUG
@@ -59,25 +60,32 @@ export default function UIDebugPanel({ commitSha, env, isAdmin }: UIDebugPanelPr
   // Diagnostic panel for admins when debug is disabled
   if (isAdmin && !uiDebugEnabled && showDiagnostic) {
     return (
-      <div className="fixed bottom-2 left-2 lg:left-72 z-40 bg-yellow-900 text-yellow-100 text-[10px] font-mono px-2 py-1.5 rounded shadow-xl border border-yellow-700 max-w-[240px]">
-        <div className="mb-1 text-yellow-300 font-semibold border-b border-yellow-700 pb-0.5 text-[10px]">
-          ⚠️ Debug Disabled
-        </div>
-        <div className="space-y-0.5 text-[10px]">
-          <div>
-            <span className="text-yellow-400">ENV:</span>{' '}
-            <span className="text-yellow-200 font-semibold">
-              {uiDebugEnv || '(not set)'}
-            </span>
+      <div className="fixed top-2 right-2 z-40 bg-yellow-900 text-yellow-100 text-[10px] font-mono rounded shadow-xl border border-yellow-700">
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="px-2 py-1 text-yellow-300 hover:bg-yellow-800 rounded-t"
+        >
+          ⚠️ Debug
+        </button>
+        {isExpanded && (
+          <div className="px-2 py-1.5 border-t border-yellow-700 max-w-[200px]">
+            <div className="space-y-0.5 text-[10px]">
+              <div>
+                <span className="text-yellow-400">ENV:</span>{' '}
+                <span className="text-yellow-200 font-semibold">
+                  {uiDebugEnv || '(not set)'}
+                </span>
+              </div>
+              <div>
+                <span className="text-yellow-400">Admin:</span>{' '}
+                <span className="text-green-400 font-semibold">{String(isAdmin)}</span>
+              </div>
+              <div className="mt-1 pt-1 border-t border-yellow-700 text-yellow-300 text-[9px]">
+                Set NEXT_PUBLIC_UI_DEBUG="true"
+              </div>
+            </div>
           </div>
-          <div>
-            <span className="text-yellow-400">Admin:</span>{' '}
-            <span className="text-green-400 font-semibold">{String(isAdmin)}</span>
-          </div>
-          <div className="mt-1 pt-1 border-t border-yellow-700 text-yellow-300 text-[9px]">
-            Set NEXT_PUBLIC_UI_DEBUG="true"
-          </div>
-        </div>
+        )}
       </div>
     )
   }
@@ -88,56 +96,63 @@ export default function UIDebugPanel({ commitSha, env, isAdmin }: UIDebugPanelPr
 
   if (!debugInfo) {
     return (
-      <div className="fixed bottom-2 left-2 lg:left-72 z-40 bg-gray-800 text-white text-[10px] font-mono px-2 py-1 rounded shadow-lg border border-gray-600">
+      <div className="fixed top-2 right-2 z-40 bg-gray-800 text-white text-[10px] font-mono px-2 py-1 rounded shadow-lg border border-gray-600">
         <div className="text-yellow-400">Loading...</div>
       </div>
     )
   }
 
   return (
-    <div className="fixed bottom-2 left-2 lg:left-72 z-40 bg-gray-900 text-white text-[10px] font-mono px-2 py-1.5 rounded shadow-xl border border-gray-700 max-w-[240px]">
-      <div className="mb-1 text-yellow-400 font-semibold border-b border-gray-700 pb-0.5 text-[10px]">
+    <div className="fixed top-2 right-2 z-40 bg-gray-900 text-white text-[10px] font-mono rounded shadow-xl border border-gray-700">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="px-2 py-1 text-yellow-400 hover:bg-gray-800 rounded-t text-[10px] font-semibold"
+      >
         🔧 Debug
-      </div>
-      <div className="space-y-0.5 text-[10px]">
-        {commitSha && (
-          <div>
-            <span className="text-gray-400">SHA:</span>{' '}
-            <span className="text-blue-400 font-semibold">{commitSha.substring(0, 7)}</span>
+      </button>
+      {isExpanded && (
+        <div className="px-2 py-1.5 border-t border-gray-700 max-w-[200px]">
+          <div className="space-y-0.5 text-[10px]">
+            {commitSha && (
+              <div>
+                <span className="text-gray-400">SHA:</span>{' '}
+                <span className="text-blue-400 font-semibold">{commitSha.substring(0, 7)}</span>
+              </div>
+            )}
+            {env && (
+              <div>
+                <span className="text-gray-400">Env:</span>{' '}
+                <span className="text-purple-400 font-semibold">{env}</span>
+              </div>
+            )}
+            <div>
+              <span className="text-gray-400">W:</span>{' '}
+              <span className="text-green-400 font-semibold">{debugInfo.windowWidth}px</span>
+            </div>
+            <div>
+              <span className="text-gray-400">Lg:</span>{' '}
+              <span className={debugInfo.isLg ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>
+                {String(debugInfo.isLg)}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-400">Sidebar:</span>{' '}
+              <span className={debugInfo.sidebarInDom ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>
+                {debugInfo.sidebarInDom ? '✓' : '✗'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-400">Shell:</span>{' '}
+              <span className={debugInfo.appShellMounted ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>
+                {debugInfo.appShellMounted ? '✓' : '✗'}
+              </span>
+            </div>
           </div>
-        )}
-        {env && (
-          <div>
-            <span className="text-gray-400">Env:</span>{' '}
-            <span className="text-purple-400 font-semibold">{env}</span>
-          </div>
-        )}
-        <div>
-          <span className="text-gray-400">W:</span>{' '}
-          <span className="text-green-400 font-semibold">{debugInfo.windowWidth}px</span>
-        </div>
-        <div>
-          <span className="text-gray-400">Lg:</span>{' '}
-          <span className={debugInfo.isLg ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>
-            {String(debugInfo.isLg)}
-          </span>
-        </div>
-        <div>
-          <span className="text-gray-400">Sidebar:</span>{' '}
-          <span className={debugInfo.sidebarInDom ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>
-            {debugInfo.sidebarInDom ? '✓' : '✗'}
-          </span>
-        </div>
-        <div>
-          <span className="text-gray-400">Shell:</span>{' '}
-          <span className={debugInfo.appShellMounted ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>
-            {debugInfo.appShellMounted ? '✓' : '✗'}
-          </span>
-        </div>
-      </div>
-      {debugInfo.isLg && !debugInfo.sidebarInDom && (
-        <div className="mt-1 pt-1 border-t border-gray-700 text-red-400 text-[9px]">
-          ⚠️ Sidebar missing
+          {debugInfo.isLg && !debugInfo.sidebarInDom && (
+            <div className="mt-1 pt-1 border-t border-gray-700 text-red-400 text-[9px]">
+              ⚠️ Sidebar missing
+            </div>
+          )}
         </div>
       )}
     </div>
