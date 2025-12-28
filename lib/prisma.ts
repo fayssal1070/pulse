@@ -11,33 +11,18 @@ if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL environment variable is not set')
 }
 
-// Parse connection string to handle SSL
-let connectionString = process.env.DATABASE_URL
-
-// For Supabase and cloud PostgreSQL providers, ensure SSL is configured
-// Add sslmode=require if not present (Supabase requires SSL)
-try {
-  const url = new URL(connectionString)
-  if (!url.searchParams.has('sslmode')) {
-    url.searchParams.set('sslmode', 'require')
-    connectionString = url.toString()
-  }
-} catch (e) {
-  // If URL parsing fails, connectionString might be in a different format
-  // Try to append sslmode if it's not already there
-  if (!connectionString.includes('sslmode=')) {
-    const separator = connectionString.includes('?') ? '&' : '?'
-    connectionString = `${connectionString}${separator}sslmode=require`
-  }
-}
+// Use original connection string - don't modify it
+// SSL should be configured in the connection string itself (e.g., ?sslmode=require)
+// or via environment variables
+const connectionString = process.env.DATABASE_URL
 
 // Configure SSL for PostgreSQL Pool (Supabase/cloud providers)
 // rejectUnauthorized: false accepts self-signed certificates
 const pool = new Pool({
   connectionString,
-  ssl: {
+  ssl: process.env.NODE_ENV === 'production' ? {
     rejectUnauthorized: false, // Accept self-signed certificates (common with Supabase)
-  },
+  } : false, // No SSL in development (local PostgreSQL)
 })
 
 const adapter = new PrismaPg(pool)
