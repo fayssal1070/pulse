@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import AppShell from '@/components/app-shell'
 import SyncNowButton from '@/components/sync-now-button'
+import SyncCurButton from '@/components/sync-cur-button'
 import Link from 'next/link'
 import FormattedDate from '@/components/formatted-date'
 import { isAdmin } from '@/lib/admin-helpers'
@@ -31,10 +32,40 @@ export default async function AccountsPage() {
         select: {
           id: true,
           name: true,
+          awsCurEnabled: true,
         },
       },
     },
   })
+
+  // Get CUR status for active org
+  let curStatus = null
+  if (activeOrg) {
+    const latestBatch = await prisma.ingestionBatch.findFirst({
+      where: {
+        orgId: activeOrg.id,
+        source: 'AWS_CUR',
+      },
+      orderBy: { startedAt: 'desc' },
+    })
+    const curAccount = await prisma.cloudAccount.findFirst({
+      where: {
+        orgId: activeOrg.id,
+        provider: 'AWS',
+        connectionType: 'CUR',
+      },
+      select: {
+        lastCurSyncAt: true,
+        lastCurSyncError: true,
+      },
+    })
+    curStatus = {
+      enabled: activeOrg.awsCurEnabled,
+      lastBatch: latestBatch,
+      lastSyncedAt: curAccount?.lastCurSyncAt,
+      lastError: curAccount?.lastCurSyncError,
+    }
+  }
 
   // Group accounts by organization
   const accountsByOrg = allAccounts.reduce((acc, account) => {
@@ -86,15 +117,45 @@ export default async function AccountsPage() {
                 Manage cloud accounts across all your organizations
               </p>
             </div>
-            {activeOrg && (
-              <Link
-                href={`/organizations/${activeOrg.id}/cloud-accounts/connect/aws`}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
-              >
-                + Connect AWS
-              </Link>
-            )}
+            <div className="flex items-center space-x-3">
+              {activeOrg && activeOrg.awsCurEnabled && isAdminUser && (
+                <SyncCurButton orgId={activeOrg.id} />
+              )}
+              {activeOrg && (
+                <Link
+                  href={`/organizations/${activeOrg.id}/cloud-accounts/connect/aws`}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+                >
+                  + Connect AWS
+                </Link>
+              )}
+            </div>
           </div>
+
+          {/* CUR Status */}
+          {curStatus && curStatus.enabled && (
+            <div className="mb-6 bg-white rounded-lg shadow p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">AWS CUR Sync Status</h3>
+                  {curStatus.lastSyncedAt && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Last synced: <FormattedDate date={curStatus.lastSyncedAt} />
+                    </p>
+                  )}
+                  {curStatus.lastBatch && (
+                    <p className="text-xs text-gray-500">
+                      Last batch: {curStatus.lastBatch.batchId} ({curStatus.lastBatch.status}) -{' '}
+                      {curStatus.lastBatch.eventsUpserted} events
+                    </p>
+                  )}
+                  {curStatus.lastError && (
+                    <p className="text-xs text-red-600 mt-1">Error: {curStatus.lastError}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Summary */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">

@@ -47,6 +47,7 @@ model Organization {
   aiGatewayKeys         AiGatewayKey[]
   aiPolicies            AiPolicy[]
   aiRequestLogs         AiRequestLog[]
+  ingestionBatches      IngestionBatch[]
   invitations           Invitation[]
   memberships           Membership[]
 
@@ -184,6 +185,8 @@ model CloudAccount {
   curBucket         String? // Override org-level CUR bucket
   curPrefix         String? // Override org-level CUR prefix
   curRegion         String? // Override org-level CUR region
+  lastCurSyncAt     DateTime?
+  lastCurSyncError   String?
   createdAt         DateTime     @default(now())
   organization      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -218,18 +221,42 @@ model CostEvent {
   dimensions       Json? // { userId, teamId, projectId, appId, clientId, model, taskType }
   tags             Json? // AWS tags or custom tags
   rawRef           Json? // CUR line identifiers or AI requestId
+  uniqueHash       String       @unique // SHA-256 hash for deduplication
   ingestionBatchId String? // For batch tracking
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   organization     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
-  @@unique([orgId, occurredAt, rawRef(path: "$.lineItemId")]) // Dedup key for AWS CUR
+  @@unique([orgId, uniqueHash], map: "CostEvent_orgId_uniqueHash_key")
   @@index([orgId])
   @@index([orgId, occurredAt])
   @@index([orgId, source])
   @@index([orgId, source, occurredAt])
   @@index([orgId, provider])
   @@index([ingestionBatchId])
+}
+
+// Ingestion batch tracking for CUR syncs
+model IngestionBatch {
+  id              String       @id @default(cuid())
+  orgId           String
+  batchId         String       @unique // Human-readable batch ID (e.g., "cur-2025-01-25-abc123")
+  source          String       @default("AWS_CUR") // "AWS_CUR" | "AI_GATEWAY" | etc.
+  status          String       @default("running") // "running" | "completed" | "failed" | "partial"
+  startedAt       DateTime     @default(now())
+  finishedAt      DateTime?
+  objectsProcessed Int         @default(0)
+  rowsParsed      Int          @default(0)
+  eventsUpserted  Int          @default(0)
+  errorsCount     Int          @default(0)
+  sampleError     String?      // First error message (truncated)
+  metadata        Json?        // Additional batch metadata
+  organization    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([orgId, startedAt])
+  @@index([orgId, status])
+  @@index([batchId])
 }
 
 // Budget model - supports org/team/project/app/client scopes
