@@ -11,7 +11,23 @@ jobs:
     steps:
       - name: Trigger Vercel Deploy
         run: |
-          curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
+          if [ -z "$VERCEL_DEPLOY_HOOK" ]; then
+            echo "❌ Error: VERCEL_DEPLOY_HOOK secret is not set"
+            exit 1
+          fi
+          echo "🔗 Calling Vercel Deploy Hook..."
+          response=$(curl -s -w "\n%{http_code}" -X POST "$VERCEL_DEPLOY_HOOK")
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          
+          if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ]; then
+            echo "✅ Deploy hook triggered successfully (HTTP $http_code)"
+            echo "Response: $body"
+          else
+            echo "❌ Deploy hook failed (HTTP $http_code)"
+            echo "Response: $body"
+            exit 1
+          fi
         env:
           VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
 
