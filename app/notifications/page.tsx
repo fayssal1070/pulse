@@ -6,11 +6,13 @@ import Link from 'next/link'
 import AppShell from '@/components/app-shell'
 import TelegramForm from '@/components/telegram-form'
 import MarkNotificationReadButton from '@/components/mark-notification-read-button'
+import { isAdmin } from '@/lib/admin-helpers'
 
 export default async function NotificationsPage() {
   const user = await requireAuth()
   const organizations = await getUserOrganizations(user.id)
   const activeOrg = await getActiveOrganization(user.id)
+  const isAdminUser = await isAdmin()
 
   // Get in-app notifications for the user and active org
   const notifications = activeOrg
@@ -48,6 +50,7 @@ export default async function NotificationsPage() {
       hasActiveAWS={hasActiveAWS}
       commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
       env={process.env.VERCEL_ENV}
+      isAdmin={isAdminUser}
     >
       <div className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">

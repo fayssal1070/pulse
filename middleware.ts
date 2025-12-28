@@ -21,6 +21,7 @@ export default async function middleware(request: NextRequest) {
   const isPublicRoute = publicRoutes.includes(pathname) ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/build-info') || // Public build info endpoint
+    pathname.startsWith('/api/admin/check') || // Admin check endpoint (protected by auth in route)
     pathname.startsWith('/invitations/') ||
     pathname.startsWith('/api/leads') ||
     pathname.startsWith('/help/') // Help pages (protected by auth in page itself)

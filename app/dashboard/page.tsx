@@ -20,8 +20,7 @@ import LastSyncedDate from '@/components/last-synced-date'
 import FormattedDate from '@/components/formatted-date'
 import ErrorBoundary from '@/components/error-boundary'
 import HydrationErrorDetector from '@/components/hydration-error-detector'
-import AppShellProbe from '@/components/appshell-probe'
-import UIDebug from '@/components/ui-debug'
+import UIDebugPanel from '@/components/ui-debug-panel'
 import { isAdmin } from '@/lib/admin-helpers'
 
 export default async function DashboardPage({
@@ -253,14 +252,19 @@ export default async function DashboardPage({
   return (
     <ErrorBoundary>
       <HydrationErrorDetector />
-      <AppShellProbe mounted={true} source="app/dashboard/page.tsx" />
       <AppShell 
         organizations={organizations} 
         activeOrgId={activeOrg?.id || null} 
         hasActiveAWS={hasActiveAWS}
         commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
         env={process.env.VERCEL_ENV}
+        isAdmin={isAdminUser}
       >
+        <UIDebugPanel 
+          commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
+          env={process.env.VERCEL_ENV}
+          isAdmin={isAdminUser}
+        />
         {showAdminError && (
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
             <div className="flex">
@@ -282,23 +286,11 @@ export default async function DashboardPage({
             <div className="mb-6 flex justify-between items-start">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-                {/* DEPLOY_PROOF: Preuve visuelle du commit déployé */}
-                <div className="mt-2 text-xs font-mono font-bold bg-black text-white px-3 py-2 rounded border-2 border-yellow-400">
-                  DEPLOY_PROOF: commit={process.env.VERCEL_GIT_COMMIT_SHA?.substring(0, 7) || 'local'} env={process.env.VERCEL_ENV || 'local'} usesAppShell=true
-                </div>
                 <p className="text-sm text-gray-500 mt-1">
                   {activeOrg
                     ? `Cost overview for ${activeOrg.name}`
                     : 'Cost overview across all your organizations'}
                 </p>
-                {/* NAV SOURCE: AppShell - Proof obligatoire */}
-                <div className="mt-2 text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded border-2 border-red-300">
-                  NAV SOURCE: AppShell (app/dashboard/page.tsx)
-                </div>
-                {/* UI Debug - Proof irréfutable */}
-                <div className="mt-2">
-                  <UIDebug />
-                </div>
               </div>
               {/* Only render DebugCostsButton if user is admin (server-side gating) */}
               {isAdminUser && <DebugCostsButton />}
@@ -316,11 +308,6 @@ export default async function DashboardPage({
                     <span className="text-3xl mb-2">☁️</span>
                     <span className="text-sm font-medium text-gray-700 text-center">Connect AWS</span>
                   </Link>
-                )}
-                {hasActiveAWS && (
-                  <div className="flex flex-col items-center justify-center p-4 border-2 border-gray-200 rounded-lg bg-gray-50">
-                    <SyncNowButton />
-                  </div>
                 )}
                 <Link
                   href="/accounts"

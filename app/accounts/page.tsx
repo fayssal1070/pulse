@@ -7,11 +7,13 @@ import AppShell from '@/components/app-shell'
 import SyncNowButton from '@/components/sync-now-button'
 import Link from 'next/link'
 import FormattedDate from '@/components/formatted-date'
+import { isAdmin } from '@/lib/admin-helpers'
 
 export default async function AccountsPage() {
   const user = await requireAuth()
   const organizations = await getUserOrganizations(user.id)
   const activeOrg = await getActiveOrganization(user.id)
+  const isAdminUser = await isAdmin()
 
   if (organizations.length === 0) {
     redirect('/organizations/new')
@@ -73,6 +75,7 @@ export default async function AccountsPage() {
       hasActiveAWS={hasActiveAWS}
       commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
       env={process.env.VERCEL_ENV}
+      isAdmin={isAdminUser}
     >
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">

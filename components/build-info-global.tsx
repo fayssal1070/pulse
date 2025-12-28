@@ -1,11 +1,35 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+
 interface BuildInfoGlobalProps {
   commitSha: string
   env: string
 }
 
 export default function BuildInfoGlobal({ commitSha, env }: BuildInfoGlobalProps) {
+  const [isAdmin, setIsAdmin] = useState(false)
+  const uiDebugEnabled = process.env.NEXT_PUBLIC_UI_DEBUG === 'true'
+
+  useEffect(() => {
+    // Check if user is admin via API
+    const checkAdmin = async () => {
+      try {
+        const res = await fetch('/api/admin/check')
+        const data = await res.json()
+        setIsAdmin(data.isAdmin || false)
+      } catch (error) {
+        // Silent fail - not admin
+        setIsAdmin(false)
+      }
+    }
+    checkAdmin()
+  }, [])
+
+  if (!uiDebugEnabled || !isAdmin) {
+    return null
+  }
+
   const commitShaShort = commitSha.substring(0, 7)
   
   return (

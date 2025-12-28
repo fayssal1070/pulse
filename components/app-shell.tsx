@@ -22,6 +22,7 @@ interface AppShellProps {
   hasActiveAWS?: boolean
   commitSha?: string
   env?: string
+  isAdmin?: boolean
 }
 
 const navigation = [
@@ -32,7 +33,9 @@ const navigation = [
   { name: 'Team', href: '/team', icon: '👥' },
 ]
 
-export default function AppShell({ children, organizations, activeOrgId, hasActiveAWS = false, commitSha, env }: AppShellProps) {
+export default function AppShell({ children, organizations, activeOrgId, hasActiveAWS = false, commitSha, env, isAdmin = false }: AppShellProps) {
+  const uiDebugEnabled = process.env.NEXT_PUBLIC_UI_DEBUG === 'true'
+  const showBuildInfo = isAdmin && uiDebugEnabled
   const pathname = usePathname()
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -65,7 +68,7 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
             </Link>
           </div>
           <div className="flex items-center space-x-2">
-            <BuildInfoBadge commitSha={commitSha} env={env} />
+            {showBuildInfo && <BuildInfoBadge commitSha={commitSha} env={env} />}
             {hasActiveAWS && <SyncNowButton />}
             <LogoutButton />
           </div>
@@ -147,10 +150,12 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
               PULSE
             </Link>
           </div>
-          {/* Build info badge - always visible */}
-          <div className="px-4 pb-2 border-b border-gray-200">
-            <BuildInfoBadge commitSha={commitSha} env={env} />
-          </div>
+          {/* Build info badge - admin only */}
+          {showBuildInfo && (
+            <div className="px-4 pb-2 border-b border-gray-200">
+              <BuildInfoBadge commitSha={commitSha} env={env} />
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto">
             <div className="px-4 py-4 border-b border-gray-200">
               <OrgSwitcher organizations={organizations} activeOrgId={activeOrgId} />
@@ -205,7 +210,7 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
               {hasActiveAWS && <SyncNowButton />}
             </div>
             <div className="flex items-center space-x-4">
-              <BuildInfoBadge commitSha={commitSha} env={env} />
+              {showBuildInfo && <BuildInfoBadge commitSha={commitSha} env={env} />}
               <Link href="/notifications" className="text-gray-700 hover:text-gray-900 relative">
                 🔔
               </Link>
