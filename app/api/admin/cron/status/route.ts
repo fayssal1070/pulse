@@ -17,7 +17,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'No active organization' }, { status: 400 })
     }
 
-    await requireRole('admin', activeOrg.id)
+    await requireRole(activeOrg.id, 'admin')
 
     // Get last run for run-alerts cron
     const lastRun = await prisma.cronRunLog.findFirst({

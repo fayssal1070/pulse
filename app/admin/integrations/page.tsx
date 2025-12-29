@@ -22,7 +22,7 @@ export default async function AdminIntegrationsPage() {
 
   // Check admin role
   try {
-    await requireRole('admin', activeOrg.id)
+    await requireRole(activeOrg.id, 'admin')
   } catch (error) {
     return (
       <div className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">

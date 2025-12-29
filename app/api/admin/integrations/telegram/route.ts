@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'No active organization' }, { status: 400 })
     }
 
-    await requireRole('admin', activeOrg.id)
+    await requireRole(activeOrg.id, 'admin')
 
     const integration = await prisma.orgIntegration.findUnique({
       where: { orgId: activeOrg.id },
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No active organization' }, { status: 400 })
     }
 
-    await requireRole('admin', activeOrg.id)
+    await requireRole(activeOrg.id, 'admin')
 
     const body = await request.json()
     const { botToken } = body
@@ -112,7 +112,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'No active organization' }, { status: 400 })
     }
 
-    await requireRole('admin', activeOrg.id)
+    await requireRole(activeOrg.id, 'admin')
 
     await prisma.orgIntegration.update({
       where: { orgId: activeOrg.id },
