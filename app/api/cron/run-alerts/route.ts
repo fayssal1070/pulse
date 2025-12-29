@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { dispatchAlertsForOrg } from '@/lib/alerts/dispatch'
 
@@ -8,7 +9,8 @@ import { dispatchAlertsForOrg } from '@/lib/alerts/dispatch'
  * Protected by CRON_SECRET
  */
 export async function POST(request: Request) {
-  const authHeader = request.headers.get('authorization')
+  const headersList = await headers()
+  const authHeader = headersList.get('authorization')
   const cronSecret = process.env.CRON_SECRET
 
   if (!cronSecret) {
