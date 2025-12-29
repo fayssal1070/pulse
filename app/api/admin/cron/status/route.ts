@@ -22,32 +22,33 @@ export async function GET(request: Request) {
     // Get last run for run-alerts cron
     const lastRun = await prisma.cronRunLog.findFirst({
       where: { cronName: 'run-alerts' },
-      orderBy: { startedAt: 'desc' },
+      orderBy: { ranAt: 'desc' },
     })
 
     // Calculate next expected run (every 2 hours)
     let nextExpectedRunHint: string | null = null
-    if (lastRun?.startedAt) {
-      const nextRun = new Date(lastRun.startedAt)
+    if (lastRun?.ranAt) {
+      const nextRun = new Date(lastRun.ranAt)
       nextRun.setHours(nextRun.getHours() + 2)
       nextExpectedRunHint = nextRun.toISOString()
     }
 
     return NextResponse.json({
       cronName: 'run-alerts',
-      lastRunAt: lastRun?.startedAt || null,
-      lastRunSummary: lastRun
+      lastRun: lastRun
         ? {
-            processedOrgs: lastRun.processedOrgs,
-            triggered: lastRun.triggered,
+            id: lastRun.id,
+            ranAt: lastRun.ranAt,
+            status: lastRun.status,
+            orgsProcessed: lastRun.orgsProcessed,
+            alertsTriggered: lastRun.alertsTriggered,
             sentEmail: lastRun.sentEmail,
             sentTelegram: lastRun.sentTelegram,
-            errorsCount: lastRun.errorsCount,
-            success: lastRun.success,
-            finishedAt: lastRun.finishedAt,
+            sentInApp: lastRun.sentInApp,
+            errorCount: lastRun.errorCount,
+            errorSample: lastRun.errorSample,
           }
         : null,
-      lastError: lastRun?.lastError || null,
       nextExpectedRunHint,
     })
   } catch (error: any) {

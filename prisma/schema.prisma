@@ -379,21 +379,22 @@ model OrgIntegration {
   @@index([orgId])
 }
 
-// Cron run logs for monitoring
+// Cron run logs for monitoring (proof of execution)
 model CronRunLog {
-  id            String    @id @default(cuid())
-  cronName      String // e.g., "run-alerts"
-  startedAt     DateTime  @default(now())
-  finishedAt    DateTime?
-  processedOrgs Int       @default(0)
-  triggered     Int       @default(0)
-  sentEmail     Int       @default(0)
-  sentTelegram  Int       @default(0)
-  errorsCount   Int       @default(0)
-  lastError     String? // First error message (truncated)
-  success       Boolean   @default(true)
+  id              String   @id @default(cuid())
+  cronName        String   // e.g., "run-alerts"
+  ranAt           DateTime @default(now()) // Execution timestamp
+  status          String   @default("OK") // "OK" | "ERROR"
+  orgsProcessed   Int      @default(0)
+  alertsTriggered Int      @default(0)
+  sentEmail       Int      @default(0)
+  sentTelegram     Int      @default(0)
+  sentInApp        Int      @default(0)
+  errorCount       Int      @default(0)
+  errorSample      String?  // First error message (truncated to 500 chars)
 
   @@index([cronName])
-  @@index([startedAt])
-  @@index([cronName, startedAt])
+  @@index([ranAt])
+  @@index([cronName, ranAt])
+  @@index([status])
 }

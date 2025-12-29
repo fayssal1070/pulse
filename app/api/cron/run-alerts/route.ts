@@ -6,39 +6,31 @@ import { dispatchAlertsForOrg } from '@/lib/alerts/dispatch'
 /**
  * Cron job to run alerts dispatch for all organizations
  * Runs every 2 hours
- * Protected by hardcoded secret: Nordic-1987-1070-1990
+ * Protected by CRON_SECRET environment variable
  */
-const CRON_SECRET = 'Nordic-1987-1070-1990'
-
 export async function POST(request: Request) {
   const headersList = await headers()
   const authHeader = headersList.get('authorization')
+  const cronSecret = process.env.CRON_SECRET
 
-  // Strict auth: only accept exact Bearer token
-  if (authHeader !== `Bearer ${CRON_SECRET}`) {
-    console.warn('[Cron run-alerts] Unauthorized attempt')
+  if (!cronSecret) {
+    console.error('CRON_RUN_ALERTS_AUTH_FAIL: CRON_SECRET not configured')
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 })
+  }
+
+  // Strict auth: only accept Authorization: Bearer <CRON_SECRET>
+  // Reject query params, other headers, etc.
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    console.warn('CRON_RUN_ALERTS_AUTH_FAIL: Invalid or missing Authorization header')
     return new Response('Unauthorized', { status: 401 })
   }
 
-  const startedAt = new Date()
+  console.log('CRON_RUN_ALERTS_AUTH_OK')
+
+  const ranAt = new Date()
   let cronLogId: string | null = null
 
   try {
-    // Create cron log entry
-    const cronLog = await prisma.cronRunLog.create({
-      data: {
-        cronName: 'run-alerts',
-        startedAt,
-        processedOrgs: 0,
-        triggered: 0,
-        sentEmail: 0,
-        sentTelegram: 0,
-        errorsCount: 0,
-        success: true,
-      },
-    })
-    cronLogId = cronLog.id
-
     // Get all active organizations
     const organizations = await prisma.organization.findMany({
       select: { id: true },
@@ -52,6 +44,7 @@ export async function POST(request: Request) {
     let totalTriggered = 0
     let totalSentEmail = 0
     let totalSentTelegram = 0
+    let totalSentInApp = 0
     const allErrors: string[] = []
 
     for (const result of results) {
@@ -59,32 +52,34 @@ export async function POST(request: Request) {
         totalTriggered += result.value.triggered
         totalSentEmail += result.value.sentEmail
         totalSentTelegram += result.value.sentTelegram
+        // Count InAppNotifications created (1 per triggered alert)
+        totalSentInApp += result.value.triggered
         allErrors.push(...result.value.errors)
       } else {
         allErrors.push(result.reason?.message || 'Unknown error')
       }
     }
 
-    const finishedAt = new Date()
-    const success = allErrors.length === 0
+    const status = allErrors.length === 0 ? 'OK' : 'ERROR'
 
-    // Update cron log
-    await prisma.cronRunLog.update({
-      where: { id: cronLogId },
+    // Insert proof log (always, even if no alerts)
+    await prisma.cronRunLog.create({
       data: {
-        finishedAt,
-        processedOrgs: organizations.length,
-        triggered: totalTriggered,
+        cronName: 'run-alerts',
+        ranAt,
+        status,
+        orgsProcessed: organizations.length,
+        alertsTriggered: totalTriggered,
         sentEmail: totalSentEmail,
         sentTelegram: totalSentTelegram,
-        errorsCount: allErrors.length,
-        lastError: allErrors.length > 0 ? allErrors[0].substring(0, 500) : null,
-        success,
+        sentInApp: totalSentInApp,
+        errorCount: allErrors.length,
+        errorSample: allErrors.length > 0 ? allErrors[0].substring(0, 500) : null,
       },
     })
 
     // Minimal server-side log (no secrets)
-    console.log(`[Cron run-alerts] Completed: ${organizations.length} orgs, ${totalTriggered} triggered, ${totalSentEmail} email, ${totalSentTelegram} telegram, ${allErrors.length} errors`)
+    console.log(`CRON_RUN_ALERTS_COMPLETED: ${organizations.length} orgs, ${totalTriggered} triggered, ${totalSentEmail} email, ${totalSentTelegram} telegram, ${totalSentInApp} in-app, ${allErrors.length} errors`)
 
     return NextResponse.json({
       message: `Alerts dispatch completed for ${organizations.length} organizations`,
@@ -92,23 +87,28 @@ export async function POST(request: Request) {
       triggered: totalTriggered,
       sentEmail: totalSentEmail,
       sentTelegram: totalSentTelegram,
+      sentInApp: totalSentInApp,
       errorsCount: allErrors.length,
       errors: allErrors.slice(0, 10), // Limit errors in response
     })
   } catch (error: any) {
-    // Update cron log on error
-    if (cronLogId) {
-      await prisma.cronRunLog.update({
-        where: { id: cronLogId },
-        data: {
-          finishedAt: new Date(),
-          lastError: error.message?.substring(0, 500) || 'Unknown error',
-          success: false,
-        },
-      }).catch(() => {}) // Ignore update errors
-    }
+    // Insert proof log on error
+    await prisma.cronRunLog.create({
+      data: {
+        cronName: 'run-alerts',
+        ranAt,
+        status: 'ERROR',
+        orgsProcessed: 0,
+        alertsTriggered: 0,
+        sentEmail: 0,
+        sentTelegram: 0,
+        sentInApp: 0,
+        errorCount: 1,
+        errorSample: error.message?.substring(0, 500) || 'Unknown error',
+      },
+    }).catch(() => {}) // Ignore insert errors if DB fails
 
-    console.error('[Cron run-alerts] Error:', error.message)
+    console.error('CRON_RUN_ALERTS_ERROR:', error.message)
     return NextResponse.json(
       { error: error.message || 'Failed to run alerts dispatch' },
       { status: 500 }
