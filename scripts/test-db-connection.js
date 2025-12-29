@@ -2,7 +2,8 @@
 require('dotenv').config({ path: '.env' });
 const { Pool } = require('pg');
 
-const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
+// Prefer DIRECT_URL for testing (used for migrations)
+const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
 
 console.log('Testing connection with:', connectionString?.replace(/:[^:@]+@/, ':****@'));
 
@@ -13,11 +14,13 @@ if (!connectionString) {
 
 // Parse connection string to determine SSL config
 const isSupabase = connectionString.includes('supabase.co') || connectionString.includes('pooler.supabase.com');
+const requiresSSL = connectionString.includes('sslmode=require') || isSupabase;
 
 const pool = new Pool({
   connectionString,
-  ssl: isSupabase ? {
+  ssl: requiresSSL ? {
     rejectUnauthorized: false, // Accept self-signed certificates for Supabase
+    require: true,
   } : false,
 });
 
