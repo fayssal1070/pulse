@@ -4,8 +4,9 @@ import { getActiveOrganization } from '@/lib/active-org'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import AppShell from '@/components/app-shell'
-import TelegramForm from '@/components/telegram-form'
 import MarkNotificationReadButton from '@/components/mark-notification-read-button'
+import MarkAllReadButton from '@/components/mark-all-read-button'
+import NotificationSettingsLink from '@/components/notification-settings-link'
 import { isAdmin } from '@/lib/admin-helpers'
 
 export default async function NotificationsPage() {
@@ -27,19 +28,6 @@ export default async function NotificationsPage() {
     : []
 
   const unreadCount = notifications.filter((n) => !n.readAt).length
-
-  // Récupérer l'organisation avec la config Telegram
-  const orgWithTelegram = activeOrg
-    ? await prisma.organization.findUnique({
-        where: { id: activeOrg.id },
-        select: {
-          id: true,
-          name: true,
-          telegramChatId: true,
-          telegramBotToken: true,
-        },
-      })
-    : null
 
   const hasActiveAWS = false
 
@@ -70,48 +58,66 @@ export default async function NotificationsPage() {
               {notifications.length === 0 ? (
                 <p className="text-gray-500 text-sm">No notifications yet</p>
               ) : (
-                <div className="space-y-3">
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`p-4 rounded border ${
-                        notification.readAt
-                          ? 'bg-gray-50 border-gray-200'
-                          : 'bg-blue-50 border-blue-200'
-                      }`}
+                <>
+                  <div className="mb-4">
+                    <button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch('/api/notifications', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ markAllRead: true }),
+                          })
+                          if (response.ok) {
+                            window.location.reload()
+                          }
+                        } catch (error) {
+                          console.error('Error marking all as read:', error)
+                        }
+                      }}
+                      className="text-sm text-blue-600 hover:text-blue-800"
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900">{notification.title}</p>
-                          <p className="text-sm text-gray-700 mt-1">{notification.body}</p>
-                          <p className="text-xs text-gray-500 mt-2">
-                            {new Date(notification.createdAt).toLocaleString()}
-                          </p>
+                      Mark all as read
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {notifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`p-4 rounded border ${
+                          notification.readAt
+                            ? 'bg-gray-50 border-gray-200'
+                            : 'bg-blue-50 border-blue-200'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">{notification.title}</p>
+                            <p className="text-sm text-gray-700 mt-1">{notification.body}</p>
+                            <p className="text-xs text-gray-500 mt-2">
+                              {new Date(notification.createdAt).toLocaleString()}
+                            </p>
+                          </div>
+                          {!notification.readAt && (
+                            <MarkNotificationReadButton notificationId={notification.id} />
+                          )}
                         </div>
-                        {!notification.readAt && (
-                          <MarkNotificationReadButton notificationId={notification.id} />
-                        )}
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           )}
 
-          {/* Telegram Configuration */}
-          {orgWithTelegram ? (
+          {/* Settings Link */}
+          {activeOrg && (
             <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Telegram Configuration</h3>
-              <TelegramForm organization={orgWithTelegram} />
-            </div>
-          ) : activeOrg ? (
-            <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-gray-500">Telegram configuration available for organization owners.</p>
-            </div>
-          ) : (
-            <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-gray-500">Please select an organization first.</p>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Notification Preferences</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Configure how you receive alerts (email, Telegram)
+              </p>
+              <NotificationSettingsLink />
             </div>
           )}
         </div>

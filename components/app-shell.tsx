@@ -30,6 +30,7 @@ const navigation = [
   { name: 'Alerts', href: '/alerts', icon: '🔔' },
   { name: 'Notifications', href: '/notifications', icon: '🔔' },
   { name: 'Team', href: '/team', icon: '👥' },
+  { name: 'Settings', href: '/settings/notifications', icon: '⚙️' },
 ]
 
 export default function AppShell({ children, organizations, activeOrgId, hasActiveAWS = false, commitSha, env, isAdmin = false }: AppShellProps) {
