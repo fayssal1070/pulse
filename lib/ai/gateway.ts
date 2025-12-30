@@ -128,6 +128,7 @@ async function checkBudgetEnforcement(
 
 /**
  * Make request to OpenAI-compatible API
+ * Supports simulation mode for development (PULSE_SIMULATE_AI=true)
  */
 async function callOpenAI(
   model: string,
@@ -141,6 +142,20 @@ async function callOpenAI(
   totalTokens: number
   requestId: string
 }> {
+  // Simulation mode (dev only)
+  const simulate = process.env.PULSE_SIMULATE_AI === 'true'
+  if (simulate) {
+    const inputTokens = Math.ceil(messages.reduce((sum, m) => sum + m.content.length, 0) / 4)
+    const outputTokens = maxTokens ? Math.floor(maxTokens * 0.7) : 500
+    return {
+      content: '[SIMULATED] This is a simulated AI response. Set PULSE_SIMULATE_AI=false to use real API.',
+      inputTokens,
+      outputTokens,
+      totalTokens: inputTokens + outputTokens,
+      requestId: `sim_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+    }
+  }
+
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY environment variable is not configured. Please set it in Vercel environment variables.')

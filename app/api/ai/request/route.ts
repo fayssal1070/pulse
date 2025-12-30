@@ -14,6 +14,13 @@ export async function POST(request: Request) {
 
     const body = await request.json()
 
+    // Extract dimensions from headers (x-pulse-*) or body
+    const teamId = request.headers.get('x-pulse-team') || body.teamId
+    const projectId = request.headers.get('x-pulse-project') || body.projectId
+    const appId = request.headers.get('x-pulse-app') || body.appId
+    const clientId = request.headers.get('x-pulse-client') || body.clientId
+    const tags = body.tags || []
+
     // Validate required fields
     if (!body.model) {
       return NextResponse.json({ error: 'model is required' }, { status: 400 })
@@ -29,14 +36,17 @@ export async function POST(request: Request) {
     const aiInput: AiRequestInput = {
       orgId: activeOrg.id,
       userId: user.id,
-      teamId: body.teamId,
-      projectId: body.projectId,
-      appId: body.appId,
-      clientId: body.clientId,
+      teamId: teamId || undefined,
+      projectId: projectId || undefined,
+      appId: appId || undefined,
+      clientId: clientId || undefined,
       model: body.model,
       maxTokens: body.maxTokens,
       temperature: body.temperature,
-      metadata: body.metadata,
+      metadata: {
+        ...body.metadata,
+        tags,
+      },
     }
 
     // Handle different input formats

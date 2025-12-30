@@ -26,7 +26,10 @@ interface AppShellProps {
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: '📊' },
+  { name: 'Costs', href: '/costs', icon: '💰' },
+  { name: 'AI Logs', href: '/logs/ai', icon: '🤖' },
   { name: 'Cloud Accounts', href: '/accounts', icon: '☁️' },
+  { name: 'Budgets', href: '/budgets', icon: '📋' },
   { name: 'Alerts', href: '/alerts', icon: '🔔' },
   { name: 'Notifications', href: '/notifications', icon: '🔔' },
   { name: 'Team', href: '/team', icon: '👥' },

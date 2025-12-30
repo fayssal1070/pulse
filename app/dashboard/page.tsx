@@ -20,6 +20,7 @@ import Recommendations from '@/components/dashboard/recommendations'
 import UIDebugPanel from '@/components/ui-debug-panel'
 import ErrorBoundary from '@/components/error-boundary'
 import HydrationErrorDetector from '@/components/hydration-error-detector'
+import SetupChecklist from '@/components/setup/setup-checklist'
 import Link from 'next/link'
 
 export default async function DashboardPage({
@@ -107,6 +108,9 @@ export default async function DashboardPage({
                 {activeOrg ? `Cost overview for ${activeOrg.name}` : 'Cost overview'}
               </p>
             </div>
+
+            {/* Setup Checklist */}
+            <SetupChecklist />
 
             {/* KPIs */}
             <KPICards kpis={kpis} />
