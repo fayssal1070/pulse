@@ -5,8 +5,8 @@ import type { NextRequest } from 'next/server'
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   
-  // Early return for /api/build-info - must be excluded completely
-  if (pathname === '/api/build-info') {
+  // Early return for public debug endpoints - must be excluded completely
+  if (pathname === '/api/build-info' || pathname === '/api/debug/db-public') {
     return NextResponse.next()
   }
   
@@ -21,6 +21,7 @@ export default async function middleware(request: NextRequest) {
   const isPublicRoute = publicRoutes.includes(pathname) ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/build-info') || // Public build info endpoint
+    pathname.startsWith('/api/debug/db-public') || // Public debug endpoint (TLS testing)
     pathname.startsWith('/api/admin/check') || // Admin check endpoint (protected by auth in route)
     pathname.startsWith('/invitations/') ||
     pathname.startsWith('/api/leads') ||
