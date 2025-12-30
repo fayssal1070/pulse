@@ -26,13 +26,20 @@ const isCloudEnvironment =
   connectionString.includes('amazonaws.com') ||
   connectionString.includes('azure.com')
 
-// Configure SSL for PostgreSQL Pool (Supabase/cloud providers)
-// rejectUnauthorized: false accepts self-signed certificates
+// Configure SSL for PostgreSQL Pool
+// If SUPABASE_DB_CA_PEM is set, instrumentation.ts will configure NODE_EXTRA_CA_CERTS
+// and we can use strict SSL validation. Otherwise, we rely on system CA certificates.
+const sslConfig: any = isCloudEnvironment
+  ? {
+      // Use strict SSL validation if CA is provided via NODE_EXTRA_CA_CERTS
+      // Otherwise, system CA certificates will be used
+      rejectUnauthorized: true, // Always validate certificates (CA must be provided)
+    }
+  : false // No SSL in local development
+
 const pool = new Pool({
   connectionString,
-  ssl: isCloudEnvironment ? {
-    rejectUnauthorized: false, // Accept self-signed certificates (common with Supabase)
-  } : false, // No SSL in local development
+  ssl: sslConfig,
 })
 
 const adapter = new PrismaPg(pool)
