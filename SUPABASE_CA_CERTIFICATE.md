@@ -11,13 +11,20 @@ This is because Supabase uses a self-signed certificate for the pooler connectio
 
 ## Solution: Download the Correct CA Certificate
 
-### Method 1: Download from Supabase Dashboard
+### Method 1: Download from Supabase Dashboard (RECOMMENDED)
 
-1. Go to your Supabase project dashboard
-2. Navigate to **Settings** → **Database**
-3. Scroll to **Connection string** section
-4. Look for **Connection pooling** → **Transaction mode** (port 6543)
-5. There should be a link to download the CA certificate, or instructions to get it
+1. Go to your Supabase project dashboard: https://supabase.com/dashboard
+2. Select your project
+3. Navigate to **Settings** → **Database**
+4. Scroll to **Connection string** section
+5. Look for **Connection pooling** → **Transaction mode** (port 6543)
+6. There should be:
+   - A **"Download CA certificate"** button/link, OR
+   - Instructions to download the certificate
+7. Download the `.pem` file
+8. Copy its content to `SUPABASE_DB_CA_PEM` in Vercel
+
+**Important:** The certificate is region-specific. Since you're using `aws-1-eu-west-1.pooler.supabase.com`, make sure you download the certificate for **EU West 1** region.
 
 ### Method 2: Download via Supabase CLI
 
