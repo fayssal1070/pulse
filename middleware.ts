@@ -49,10 +49,11 @@ export const config = {
     /*
      * Match all request paths except for the ones starting with:
      * - /api/build-info (public build info endpoint - excluded from middleware)
+     * - /api/debug/db-public (public debug endpoint - excluded from middleware)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      */
-    '/((?!api/build-info|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api/build-info|api/debug/db-public|_next/static|_next/image|favicon.ico).*)',
   ],
 }
