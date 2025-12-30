@@ -104,6 +104,27 @@ export async function GET(request: Request) {
     error: queryError,
     hasExtraCa: !!process.env.NODE_EXTRA_CA_CERTS,
     extraCaPath: process.env.NODE_EXTRA_CA_CERTS || null,
+    caFileExists: (() => {
+      try {
+        const fs = require('fs')
+        const caPath = process.env.NODE_EXTRA_CA_CERTS
+        return caPath ? fs.existsSync(caPath) : false
+      } catch {
+        return false
+      }
+    })(),
+    caFileSize: (() => {
+      try {
+        const fs = require('fs')
+        const caPath = process.env.NODE_EXTRA_CA_CERTS
+        if (caPath && fs.existsSync(caPath)) {
+          return fs.statSync(caPath).size
+        }
+        return null
+      } catch {
+        return null
+      }
+    })(),
     nodeEnv: process.env.NODE_ENV || 'development',
     vercelEnv: process.env.VERCEL_ENV || null,
   })

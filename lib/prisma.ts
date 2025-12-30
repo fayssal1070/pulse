@@ -54,11 +54,37 @@ const sslConfig: any = isCloudEnvironment
           const fs = require('fs')
           if (fs.existsSync(caPath)) {
             const caCert = fs.readFileSync(caPath, 'utf8')
-            config.ca = caCert
-            console.log('[Prisma] ✅ CA certificate loaded from:', caPath)
+            // Validate certificate format
+            if (caCert.includes('-----BEGIN CERTIFICATE-----') && caCert.includes('-----END CERTIFICATE-----')) {
+              config.ca = caCert
+              const certLength = caCert.length
+              const certLines = caCert.split('\n').length
+              console.log(`[Prisma] ✅ CA certificate loaded from: ${caPath} (${certLength} chars, ${certLines} lines)`)
+            } else {
+              console.error('[Prisma] ❌ CA certificate file exists but does not contain valid PEM format')
+            }
+          } else {
+            console.error(`[Prisma] ❌ CA certificate file not found at: ${caPath}`)
           }
         } catch (error: any) {
-          console.warn('[Prisma] ⚠️  Could not read CA certificate from', caPath, ':', error.message)
+          console.error('[Prisma] ❌ Could not read CA certificate from', caPath, ':', error.message)
+        }
+      } else {
+        // Try reading directly from SUPABASE_DB_CA_PEM if NODE_EXTRA_CA_CERTS not set
+        const caPem = process.env.SUPABASE_DB_CA_PEM
+        if (caPem) {
+          try {
+            // Format the PEM (handle escaped newlines)
+            const formattedPem = caPem.replace(/\\n/g, '\n').trim()
+            if (formattedPem.includes('-----BEGIN CERTIFICATE-----') && formattedPem.includes('-----END CERTIFICATE-----')) {
+              config.ca = formattedPem
+              console.log('[Prisma] ✅ CA certificate loaded directly from SUPABASE_DB_CA_PEM')
+            } else {
+              console.error('[Prisma] ❌ SUPABASE_DB_CA_PEM does not contain valid PEM format')
+            }
+          } catch (error: any) {
+            console.error('[Prisma] ❌ Could not parse SUPABASE_DB_CA_PEM:', error.message)
+          }
         }
       }
 
