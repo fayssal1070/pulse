@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth/rbac'
-import { getActiveOrganization } from '@/lib/auth/session'
+import { getActiveOrganization } from '@/lib/active-org'
 
 /**
  * GET /api/debug/db-connection
