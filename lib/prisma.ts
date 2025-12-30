@@ -118,12 +118,26 @@ const sslConfig: any = isCloudEnvironment
 if (sslConfig && typeof sslConfig === 'object') {
   const hasCa = !!sslConfig.ca
   const caLength = sslConfig.ca ? String(sslConfig.ca).length : 0
-  console.log(`[Prisma] SSL config: rejectUnauthorized=${sslConfig.rejectUnauthorized}, hasCA=${hasCa}, caLength=${caLength}`)
+  const caStartsWith = sslConfig.ca ? String(sslConfig.ca).substring(0, 30) : 'N/A'
+  console.log(`[Prisma] SSL config: rejectUnauthorized=${sslConfig.rejectUnauthorized}, hasCA=${hasCa}, caLength=${caLength}, caStart="${caStartsWith}..."`)
+  
+  // Additional validation: ensure CA is a string (not array)
+  if (hasCa && !Array.isArray(sslConfig.ca) && typeof sslConfig.ca !== 'string') {
+    console.error('[Prisma] ❌ CA certificate is not a string or array:', typeof sslConfig.ca)
+  }
 }
 
 const pool = new Pool({
   connectionString,
   ssl: sslConfig,
+})
+
+// Test connection immediately to catch SSL errors early
+pool.on('error', (err) => {
+  console.error('[Prisma] Pool error:', err.message)
+  if (err.message.includes('certificate') || err.message.includes('TLS')) {
+    console.error('[Prisma] ⚠️  TLS/Certificate error detected. Check SUPABASE_DB_CA_PEM configuration.')
+  }
 })
 
 const adapter = new PrismaPg(pool)
