@@ -10,8 +10,8 @@ export default defineConfig({
     seed: "node prisma/seed.js",
   },
   datasource: {
-    // Use DIRECT_URL for migrations (session pooler or direct connection)
-    // Use DATABASE_URL for runtime (transaction pooler)
+    // Prisma 7.2: url and directUrl are now in schema.prisma
+    // This config file is kept for compatibility but schema.prisma takes precedence
     url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
   },
 });

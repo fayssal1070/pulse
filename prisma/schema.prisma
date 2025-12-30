@@ -3,7 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // Port 6543 + pgbouncer=true
+  directUrl = env("DIRECT_URL") // Port 5432
 }
 
 model User {
