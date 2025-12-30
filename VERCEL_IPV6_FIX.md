@@ -21,11 +21,16 @@ Set both `DATABASE_URL` and `DIRECT_URL` to use the **pooler (port 6543)**:
 
 ```bash
 # Runtime queries (transaction pooler)
-DATABASE_URL=postgresql://postgres.[PROJECT]:[PASSWORD]@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true
+DATABASE_URL=postgresql://postgres.[PROJECT]:[PASSWORD]@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=1
 
 # Migrations (also use pooler since Vercel can't access IPv6 direct connection)
 DIRECT_URL=postgresql://postgres.[PROJECT]:[PASSWORD]@aws-1-eu-west-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true
 ```
+
+**IMPORTANT:** 
+- ❌ **NE PAS utiliser** `db.xxxxx.supabase.co:6543` - cette URL directe n'expose pas le pooler
+- ✅ **Utiliser** `aws-1-eu-west-1.pooler.supabase.com:6543` pour les deux URLs
+- ✅ **Ajouter** `sslmode=require` pour la sécurité TLS
 
 **Important:** Both URLs use port **6543** (pooler), not 5432 (direct).
 
