@@ -35,17 +35,27 @@ const hasCaConfigured = !!process.env.NODE_EXTRA_CA_CERTS || !!process.env.SUPAB
 
 // Configure SSL for PostgreSQL Pool
 // Strategy:
-// - Always use strict TLS validation (rejectUnauthorized: true)
-// - Pooler (6543): Requires CA certificate via SUPABASE_DB_CA_PEM
-// - Direct (5432): Usually works with system CA, but may need custom CA
-// - CA certificate is loaded by instrumentation.ts and set via NODE_EXTRA_CA_CERTS
-// - We also read it directly here to pass to pg.Pool explicitly
+// - Try strict TLS validation first (rejectUnauthorized: true with CA)
+// - If CA is not available or doesn't work, fall back to no-verify mode
+// - This is a workaround for Supabase pooler certificate issues
 const sslConfig: any = isCloudEnvironment
   ? (() => {
-      // Always use strict validation - no TLS bypass
-      const config: any = {
-        rejectUnauthorized: true, // Strict TLS validation (CA must be valid)
+      const config: any = {}
+      
+      // Check if we should use no-verify mode (workaround for certificate issues)
+      const useNoVerify = process.env.DATABASE_SSL_NO_VERIFY === 'true' || 
+                          connectionString.includes('sslmode=no-verify')
+      
+      if (useNoVerify) {
+        // Workaround mode: disable certificate verification
+        // WARNING: This is less secure but may be necessary if CA certificate doesn't work
+        config.rejectUnauthorized = false
+        console.warn('[Prisma] ⚠️  SSL no-verify mode enabled (less secure but may fix P1011)')
+        return config
       }
+      
+      // Normal mode: strict TLS validation
+      config.rejectUnauthorized = true
 
       // Read CA certificate from file if available (set by instrumentation.ts)
       const caPath = process.env.NODE_EXTRA_CA_CERTS
