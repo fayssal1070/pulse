@@ -111,10 +111,33 @@ SUPABASE_DB_CA_PEM=-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----
 
 ### 1. Test Connection (Admin Only)
 
-```bash
-curl https://your-app.vercel.app/api/debug/db \
-  -H "Cookie: next-auth.session-token=YOUR_SESSION_TOKEN"
-```
+**Method 1: Direct Browser Test (Easiest)**
+
+1. Log in to your app as admin user
+2. Open browser DevTools (F12) → Console
+3. Run:
+   ```javascript
+   fetch('/api/debug/db').then(r => r.json()).then(console.log)
+   ```
+4. Check the response in console
+
+**Method 2: Using Browser Address Bar**
+
+1. Log in to your app as admin user
+2. Navigate directly to: `https://your-app.vercel.app/api/debug/db`
+3. You should see JSON response
+
+**Method 3: Using curl (Advanced)**
+
+1. Log in to your app in browser
+2. Open DevTools (F12) → Application/Storage → Cookies
+3. Find cookie named `next-auth.session-token`
+4. Copy its value
+5. Run:
+   ```bash
+   curl https://your-app.vercel.app/api/debug/db \
+     -H "Cookie: next-auth.session-token=PASTE_TOKEN_HERE"
+   ```
 
 **Expected response:**
 ```json

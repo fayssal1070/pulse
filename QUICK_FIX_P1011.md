@@ -75,8 +75,17 @@ If you don't want to deal with CA certificates, **switch to direct connection**:
 
 ## Verify Your Current Setup
 
-After deployment, check `/api/debug/db` (admin only) to see:
-- Connection type (pooler vs direct)
-- Whether CA is configured
-- Connection test result
+After deployment, test the connection:
+
+**Easy method (browser):**
+1. Log in to your app as admin
+2. Open browser console (F12)
+3. Run: `fetch('/api/debug/db').then(r => r.json()).then(console.log)`
+4. Or navigate directly to: `https://your-app.vercel.app/api/debug/db`
+
+**What to check:**
+- `ok: true` = connection works
+- `db.connectionType` = "pooler" or "direct"
+- `db.hasCa` = true if CA is configured
+- `error` = null if connection successful
 
