@@ -16,10 +16,19 @@ if (!connectionString) {
 const isSupabase = connectionString.includes('supabase.co') || connectionString.includes('pooler.supabase.com');
 const requiresSSL = connectionString.includes('sslmode=require') || isSupabase;
 
+// Check if CA is configured (via NODE_EXTRA_CA_CERTS set by instrumentation.ts)
+const hasCa = !!process.env.NODE_EXTRA_CA_CERTS || !!process.env.SUPABASE_DB_CA_PEM;
+const isPooler = connectionString.includes(':6543') || connectionString.includes('pooler.supabase.com');
+
+if (requiresSSL && isPooler && !hasCa) {
+  console.warn('⚠️  Pooler connection (6543) detected but no CA certificate found.');
+  console.warn('   Set SUPABASE_DB_CA_PEM environment variable for pooler connections.');
+}
+
 const pool = new Pool({
   connectionString,
   ssl: requiresSSL ? {
-    rejectUnauthorized: false, // Accept self-signed certificates for Supabase
+    rejectUnauthorized: true, // Strict TLS validation (CA must be provided via NODE_EXTRA_CA_CERTS)
     require: true,
   } : false,
 });

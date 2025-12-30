@@ -35,35 +35,40 @@ const hasCaConfigured = !!process.env.NODE_EXTRA_CA_CERTS || !!process.env.SUPAB
 
 // Configure SSL for PostgreSQL Pool
 // Strategy:
-// - Pooler (6543): ALWAYS requires CA certificate (Supabase pooler uses self-signed certs)
-// - Direct (5432): Try with system CA first, but may need custom CA in some cases
-// - If CA is configured via NODE_EXTRA_CA_CERTS, use strict validation
-// - Otherwise, for direct connections, try with system CA (may work)
+// - Always use strict TLS validation (rejectUnauthorized: true)
+// - Pooler (6543): Requires CA certificate via SUPABASE_DB_CA_PEM
+// - Direct (5432): Usually works with system CA, but may need custom CA
+// - CA certificate is loaded by instrumentation.ts and set via NODE_EXTRA_CA_CERTS
 const sslConfig: any = isCloudEnvironment
   ? (() => {
-      // Pooler connections ALWAYS need CA
-      if (isPoolerConnection && !hasCaConfigured) {
-        console.error(
-          '[Prisma] Pooler connection (6543) detected but SUPABASE_DB_CA_PEM not configured. ' +
-          'Pooler connections require CA certificate. Please set SUPABASE_DB_CA_PEM in Vercel environment variables.'
-        )
-        // Still try, but will likely fail with P1011
-        return { rejectUnauthorized: true }
+      // Always use strict validation - no TLS bypass
+      const config: any = {
+        rejectUnauthorized: true, // Strict TLS validation (CA must be valid)
       }
 
-      // Direct connections: use strict validation if CA is configured
-      // Otherwise, try with system CA (may work for direct connections)
-      if (isDirectConnection && !hasCaConfigured) {
-        console.warn(
-          '[Prisma] Direct connection (5432) detected without CA. ' +
-          'Using system CA certificates. If you get P1011 error, set SUPABASE_DB_CA_PEM.'
-        )
-        // Try with system CA first (may work)
-        return { rejectUnauthorized: true }
+      // Log connection type and CA status for debugging
+      if (isPoolerConnection) {
+        if (!hasCaConfigured) {
+          console.error(
+            '[Prisma] ⚠️  Pooler connection (6543) detected but SUPABASE_DB_CA_PEM not configured. ' +
+            'Pooler connections require CA certificate. Connection will fail with P1011. ' +
+            'Please set SUPABASE_DB_CA_PEM in Vercel environment variables.'
+          )
+        } else {
+          console.log('[Prisma] ✅ Pooler connection (6543) with CA certificate configured')
+        }
+      } else if (isDirectConnection) {
+        if (!hasCaConfigured) {
+          console.log(
+            '[Prisma] ℹ️  Direct connection (5432) using system CA certificates. ' +
+            'If you get P1011, set SUPABASE_DB_CA_PEM.'
+          )
+        } else {
+          console.log('[Prisma] ✅ Direct connection (5432) with CA certificate configured')
+        }
       }
 
-      // CA is configured, use strict validation
-      return { rejectUnauthorized: true }
+      return config
     })()
   : false // No SSL in local development
 
