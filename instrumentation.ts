@@ -26,7 +26,12 @@ export async function register() {
 
         // Ensure multiline PEM is properly formatted
         // Handle both \n (escaped) and actual newlines
-        const formattedPem = caPem.replace(/\\n/g, '\n').replace(/\r\n/g, '\n')
+        // Also handle if Vercel stores it as multiline (with actual newlines)
+        let formattedPem = caPem
+          .replace(/\\n/g, '\n')  // Replace escaped \n with actual newline
+          .replace(/\r\n/g, '\n') // Replace Windows line endings
+          .replace(/\r/g, '\n')   // Replace old Mac line endings
+          .trim()                  // Remove leading/trailing whitespace
 
         // Validate PEM format
         if (!formattedPem.includes('-----BEGIN CERTIFICATE-----') || !formattedPem.includes('-----END CERTIFICATE-----')) {

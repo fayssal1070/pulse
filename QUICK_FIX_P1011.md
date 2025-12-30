@@ -27,14 +27,27 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
 
 ### Step 2: Add to Vercel Environment Variables
 
+**⚠️ IMPORTANT: Vercel may not handle multiline values correctly. Use single-line format.**
+
 1. Go to Vercel Dashboard → Your Project → Settings → Environment Variables
 2. Add a new variable:
    - **Name:** `SUPABASE_DB_CA_PEM`
-   - **Value:** Paste the entire certificate as a **single line** with `\n` for newlines:
-     ```
-     -----BEGIN CERTIFICATE-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...\n-----END CERTIFICATE-----
-     ```
-   - **Important:** Replace actual newlines with `\n` (backslash + n)
+   - **Value:** Convert certificate to **single line** with `\n` for newlines
+
+**How to convert:**
+- Copy your certificate (multiline format)
+- Replace every newline with `\n` (backslash + n)
+- Or use this script: `node scripts/convert-cert-to-oneline.js < certificate.pem`
+
+**Example format:**
+```
+-----BEGIN CERTIFICATE-----\nMIIDXDCCAqygAwIBAgIUbLxMod62P2ktCiAkxnKJwtE9VPYwDQYJKoZIhvcNAQELBQAwazELMAkGA1UEBhMCVVMXEDAOBgNVBAgMB0R1bHdhcmUxEzARBgNVBAcMCk51dyBDYXN0bGUxFTATBgNVBAoMDFN1cGFiYXN1IEluYzEeMBwGA1UEAwwVU3VwYWJhc2UgUm9vdCAyMDIXIENBMB4XDTIxMDQyODEwNTY1M10XDTMxMDQyNjEwNTY1M1owazELMAkGA1UEBhMCVVMXEDAOBgNVBAgMB0R1bHdhcmUxEzARBgNVBAcMCk51dyBDYXN0bGUxFTATBgNVBAoMDFN1cGFiYXN1IEluYzEeMBwGA1UEAwwVU3VwYWJhc2UgUm9vdCAyMDIXIENB...\n-----END CERTIFICATE-----
+```
+
+**Important:** 
+- The certificate must include `-----BEGIN CERTIFICATE-----` and `-----END CERTIFICATE-----`
+- Use `\n` (backslash + n), NOT actual newlines
+- It should be ONE continuous line
 
 ### Step 3: Redeploy
 
