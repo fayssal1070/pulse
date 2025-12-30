@@ -50,12 +50,15 @@ const sslConfig: any = isCloudEnvironment
         // Workaround mode: disable certificate verification
         // WARNING: This is less secure but may be necessary if CA certificate doesn't work
         config.rejectUnauthorized = false
-        console.warn('[Prisma] ⚠️  SSL no-verify mode enabled (less secure but may fix P1011)')
+        console.warn('[Prisma] ⚠️  SSL no-verify mode enabled (less secure but fixes P1011)')
         return config
       }
       
       // Normal mode: strict TLS validation
       config.rejectUnauthorized = true
+      
+      // For pooler connections, we need CA certificate
+      // If not available, log warning but continue (will likely fail with P1011)
 
       // Read CA certificate from file if available (set by instrumentation.ts)
       const caPath = process.env.NODE_EXTRA_CA_CERTS
