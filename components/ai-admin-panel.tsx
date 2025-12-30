@@ -137,7 +137,8 @@ export default function AiAdminPanel({
       }
 
       const data = await res.json()
-      alert(`Success! Response: ${data.content}\nCost: ${data.estimatedCostEur?.toFixed(4)} EUR`)
+      const cost = data.estimatedCostEur ? Number(data.estimatedCostEur).toFixed(4) : '0.0000'
+      alert(`Success! Response: ${data.content}\nCost: ${cost} EUR`)
       
       // Refresh requests
       window.location.reload()
