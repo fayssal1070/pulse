@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth-helpers'
 import { requireRole } from '@/lib/auth/rbac'
 import { getActiveOrganization } from '@/lib/active-org'
 
@@ -14,16 +15,15 @@ import { getActiveOrganization } from '@/lib/active-org'
  */
 export async function GET() {
   try {
-    // Admin only
-    const activeOrg = await getActiveOrganization()
+    // Admin only - use same auth pattern as /api/debug/db
+    const user = await requireAuth()
+    const activeOrg = await getActiveOrganization(user.id)
+
     if (!activeOrg) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'No active organization' }, { status: 400 })
     }
 
-    const hasAccess = await requireRole(activeOrg.id, 'admin')
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Admin only' }, { status: 403 })
-    }
+    await requireRole(activeOrg.id, 'admin')
 
     // Parse connection URLs (sanitize credentials)
     const parseUrl = (url: string | undefined): { host: string | null; port: string | null; urlMasked: string | null } => {
