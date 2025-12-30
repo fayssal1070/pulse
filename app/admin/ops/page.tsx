@@ -3,7 +3,7 @@ import { requireRole } from '@/lib/auth/rbac'
 import { getUserOrganizations } from '@/lib/organizations'
 import { getActiveOrganization } from '@/lib/active-org'
 import AppShell from '@/components/app-shell'
-import CronStatusClient from '@/components/admin/cron-status-client'
+import OpsDashboardClient from '@/components/admin/ops-dashboard-client'
 
 export default async function AdminOpsPage() {
   const user = await requireAuth()
@@ -42,7 +42,11 @@ export default async function AdminOpsPage() {
       env={process.env.VERCEL_ENV}
       isAdmin={true}
     >
-      <CronStatusClient />
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Operations Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-1">Monitor cron jobs, CUR sync, and system health</p>
+      </div>
+      <OpsDashboardClient />
     </AppShell>
   )
 }

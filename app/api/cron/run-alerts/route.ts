@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   console.log('CRON_RUN_ALERTS_AUTH_OK')
 
   const ranAt = new Date()
-  let cronLogId: string | null = null
+  const startTime = Date.now()
 
   try {
     // Get all active organizations
@@ -61,6 +61,7 @@ export async function POST(request: Request) {
     }
 
     const status = allErrors.length === 0 ? 'OK' : 'ERROR'
+    const durationMs = Date.now() - startTime
 
     // Insert proof log (always, even if no alerts)
     await prisma.cronRunLog.create({
@@ -73,6 +74,7 @@ export async function POST(request: Request) {
         sentEmail: totalSentEmail,
         sentTelegram: totalSentTelegram,
         sentInApp: totalSentInApp,
+        durationMs,
         errorCount: allErrors.length,
         errorSample: allErrors.length > 0 ? allErrors[0].substring(0, 500) : null,
       },
@@ -92,6 +94,7 @@ export async function POST(request: Request) {
       errors: allErrors.slice(0, 10), // Limit errors in response
     })
   } catch (error: any) {
+    const durationMs = Date.now() - startTime
     // Insert proof log on error
     await prisma.cronRunLog.create({
       data: {
@@ -103,6 +106,7 @@ export async function POST(request: Request) {
         sentEmail: 0,
         sentTelegram: 0,
         sentInApp: 0,
+        durationMs,
         errorCount: 1,
         errorSample: error.message?.substring(0, 500) || 'Unknown error',
       },

@@ -15,6 +15,7 @@ export default function NotificationSettingsClient() {
   const [saving, setSaving] = useState(false)
   const [testingEmail, setTestingEmail] = useState(false)
   const [testingTelegram, setTestingTelegram] = useState(false)
+  const [testingAlert, setTestingAlert] = useState(false)
   const [prefs, setPrefs] = useState<NotificationPreference | null>(null)
   const [emailEnabled, setEmailEnabled] = useState(true)
   const [telegramEnabled, setTelegramEnabled] = useState(false)
@@ -116,6 +117,35 @@ export default function NotificationSettingsClient() {
       showToast(`Error: ${error.message}`, 'error')
     } finally {
       setTestingTelegram(false)
+    }
+  }
+
+  const handleTestAlert = async () => {
+    setTestingAlert(true)
+    try {
+      const response = await fetch('/api/settings/notifications/test-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      const data = await response.json()
+      if (data.error) {
+        showToast(`Error: ${data.error}`, 'error')
+      } else {
+        const channels = []
+        if (data.results.inApp) channels.push('in-app')
+        if (data.results.email) channels.push('email')
+        if (data.results.telegram) channels.push('Telegram')
+        showToast(
+          `Test alert sent successfully! Check: ${channels.join(', ')}${data.results.errors.length > 0 ? ` (${data.results.errors.length} errors)` : ''}`,
+          'success'
+        )
+      }
+    } catch (error: any) {
+      console.error('Error sending test alert:', error)
+      showToast(`Error: ${error.message}`, 'error')
+    } finally {
+      setTestingAlert(false)
     }
   }
 
@@ -222,6 +252,23 @@ export default function NotificationSettingsClient() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Test Alert Button */}
+            <div className="pt-4 border-t">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Test Alert</h3>
+                <p className="text-sm text-gray-500 mb-3">
+                  Send a test alert to verify all notification channels (in-app, email, Telegram) based on your preferences.
+                </p>
+                <button
+                  onClick={handleTestAlert}
+                  disabled={testingAlert}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {testingAlert ? 'Sending...' : 'Send test alert (in-app/email/telegram)'}
+                </button>
+              </div>
             </div>
 
             {/* Save Button */}
