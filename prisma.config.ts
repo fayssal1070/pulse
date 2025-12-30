@@ -11,10 +11,10 @@ export default defineConfig({
   },
   datasource: {
     // Prisma 7.2: Only 'url' and 'shadowDatabaseUrl' are supported in datasource config
-    // url: Port 6543 + pgbouncer=true (for runtime queries via transaction pooler)
-    // For migrations, Prisma will use DIRECT_URL if available via environment variable
-    url: process.env["DATABASE_URL"],
-    // Note: directUrl is not supported in prisma.config.ts for Prisma 7.2
-    // Migrations will use DIRECT_URL from environment if available, otherwise DATABASE_URL
+    // IMPORTANT: Vercel doesn't support IPv6, so we MUST use pooler (6543) for both
+    // - url: Pooler (Port 6543) - IPv4 accessible depuis Vercel - pour runtime queries ET migrations
+    // - Direct connection (5432) uses IPv6 and won't work from Vercel
+    // Solution: Set both DATABASE_URL and DIRECT_URL to pooler (6543) in Vercel
+    url: process.env["DATABASE_URL"], // Pooler 6543 (IPv4) - utilisé pour queries ET migrations
   },
 });
