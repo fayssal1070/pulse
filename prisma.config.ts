@@ -10,8 +10,10 @@ export default defineConfig({
     seed: "node prisma/seed.js",
   },
   datasource: {
-    // Prisma 7.2: url and directUrl are now in schema.prisma
-    // This config file is kept for compatibility but schema.prisma takes precedence
-    url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
+    // Prisma 7.2: url and directUrl must be in prisma.config.ts, not schema.prisma
+    // url: Port 6543 + pgbouncer=true (for runtime queries via transaction pooler)
+    url: process.env["DATABASE_URL"],
+    // directUrl: Port 5432 (for migrations via direct connection)
+    directUrl: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
   },
 });
