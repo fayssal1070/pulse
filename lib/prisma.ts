@@ -114,6 +114,13 @@ const sslConfig: any = isCloudEnvironment
     })()
   : false // No SSL in local development
 
+// Log SSL config (without exposing certificate content)
+if (sslConfig && typeof sslConfig === 'object') {
+  const hasCa = !!sslConfig.ca
+  const caLength = sslConfig.ca ? String(sslConfig.ca).length : 0
+  console.log(`[Prisma] SSL config: rejectUnauthorized=${sslConfig.rejectUnauthorized}, hasCA=${hasCa}, caLength=${caLength}`)
+}
+
 const pool = new Pool({
   connectionString,
   ssl: sslConfig,
