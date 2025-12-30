@@ -9,27 +9,27 @@ When connecting to Supabase PostgreSQL from Vercel, you may encounter:
 Error: P1011: Error opening a TLS connection: self-signed certificate in certificate chain
 ```
 
-## Solution: Use CA Certificate (Recommended)
+## Solution: Use Direct Connection (Port 5432) - Recommended
 
-### Option 1: Direct Connection (Port 5432) - Preferred
-
-**Use the direct connection URL from Supabase**, which typically uses port `5432` and has proper SSL certificates:
+**Use the direct connection URL from Supabase**, which typically uses port `5432`:
 
 1. In Supabase Dashboard → Project Settings → Database
 2. Copy the **Connection string** (not the Pooler connection)
 3. Format: `postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres?sslmode=require`
 
 **Advantages:**
-- Uses standard PostgreSQL SSL certificates
-- No CA certificate needed
+- Usually works with system CA certificates (no custom CA needed)
 - Better for migrations and long-running queries
 - More reliable connection
+- Simpler configuration
 
 **Vercel Environment Variables:**
 ```
 DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres?sslmode=require
 DIRECT_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres?sslmode=require
 ```
+
+**Note:** If you still get P1011 with direct connection, you may need to set `SUPABASE_DB_CA_PEM` (see Option 2).
 
 ### Option 2: Pooler Connection (Port 6543) with CA Certificate
 
