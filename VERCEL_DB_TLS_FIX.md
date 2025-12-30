@@ -109,35 +109,21 @@ SUPABASE_DB_CA_PEM=-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----
 
 ## Verification
 
-### 1. Test Connection (Admin Only)
+### 1. Test Connection (Public Endpoint - No Login Required)
 
-**Method 1: Direct Browser Test (Easiest)**
+**⚠️ IMPORTANT: Use this endpoint when you can't log in due to auth failures**
 
-1. Log in to your app as admin user
-2. Open browser DevTools (F12) → Console
-3. Run:
-   ```javascript
-   fetch('/api/debug/db').then(r => r.json()).then(console.log)
-   ```
-4. Check the response in console
+Navigate directly in your browser:
+```
+https://pulse-sigma-eight.vercel.app/api/debug/db-public?secret=debug-tls-2024
+```
 
-**Method 2: Using Browser Address Bar**
+**Or using curl:**
+```bash
+curl "https://pulse-sigma-eight.vercel.app/api/debug/db-public?secret=debug-tls-2024"
+```
 
-1. Log in to your app as admin user
-2. Navigate directly to: `https://your-app.vercel.app/api/debug/db`
-3. You should see JSON response
-
-**Method 3: Using curl (Advanced)**
-
-1. Log in to your app in browser
-2. Open DevTools (F12) → Application/Storage → Cookies
-3. Find cookie named `next-auth.session-token`
-4. Copy its value
-5. Run:
-   ```bash
-   curl https://your-app.vercel.app/api/debug/db \
-     -H "Cookie: next-auth.session-token=PASTE_TOKEN_HERE"
-   ```
+**Note:** The secret `debug-tls-2024` is the default. You can set `DEBUG_DB_SECRET` in Vercel to customize it.
 
 **Expected response:**
 ```json

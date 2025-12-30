@@ -75,17 +75,22 @@ If you don't want to deal with CA certificates, **switch to direct connection**:
 
 ## Verify Your Current Setup
 
-After deployment, test the connection:
+**Since you can't log in (auth fails), use this public test endpoint:**
 
-**Easy method (browser):**
-1. Log in to your app as admin
-2. Open browser console (F12)
-3. Run: `fetch('/api/debug/db').then(r => r.json()).then(console.log)`
-4. Or navigate directly to: `https://your-app.vercel.app/api/debug/db`
+1. Navigate to (replace with your Vercel URL):
+   ```
+   https://pulse-sigma-eight.vercel.app/api/debug/db-public?secret=debug-tls-2024
+   ```
 
-**What to check:**
-- `ok: true` = connection works
-- `db.connectionType` = "pooler" or "direct"
-- `db.hasCa` = true if CA is configured
-- `error` = null if connection successful
+2. You should see JSON response with:
+   - `ok: true` = connection works ✅
+   - `ok: false` = connection failed ❌
+   - `error.code` = "P1011" if TLS issue
+   - `db.connectionType` = "pooler" or "direct"
+   - `db.hasCa` = true/false (is CA configured)
+
+**What the response tells you:**
+- If `ok: false` and `error.code: "P1011"` → TLS certificate issue
+- If `db.connectionType: "pooler"` and `db.hasCa: false` → Need to set SUPABASE_DB_CA_PEM
+- If `db.connectionType: "direct"` and `ok: false` → May need CA or switch URLs
 
