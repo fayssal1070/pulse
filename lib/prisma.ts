@@ -39,11 +39,27 @@ const hasCaConfigured = !!process.env.NODE_EXTRA_CA_CERTS || !!process.env.SUPAB
 // - Pooler (6543): Requires CA certificate via SUPABASE_DB_CA_PEM
 // - Direct (5432): Usually works with system CA, but may need custom CA
 // - CA certificate is loaded by instrumentation.ts and set via NODE_EXTRA_CA_CERTS
+// - We also read it directly here to pass to pg.Pool explicitly
 const sslConfig: any = isCloudEnvironment
   ? (() => {
       // Always use strict validation - no TLS bypass
       const config: any = {
         rejectUnauthorized: true, // Strict TLS validation (CA must be valid)
+      }
+
+      // Read CA certificate from file if available (set by instrumentation.ts)
+      const caPath = process.env.NODE_EXTRA_CA_CERTS
+      if (caPath) {
+        try {
+          const fs = require('fs')
+          if (fs.existsSync(caPath)) {
+            const caCert = fs.readFileSync(caPath, 'utf8')
+            config.ca = caCert
+            console.log('[Prisma] ✅ CA certificate loaded from:', caPath)
+          }
+        } catch (error: any) {
+          console.warn('[Prisma] ⚠️  Could not read CA certificate from', caPath, ':', error.message)
+        }
       }
 
       // Log connection type and CA status for debugging
