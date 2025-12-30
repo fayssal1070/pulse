@@ -366,7 +366,7 @@ export default function AiAdminPanel({
                       <td className="px-4 py-2 text-sm font-mono">{req.model}</td>
                       <td className="px-4 py-2 text-sm">{req.totalTokens?.toLocaleString() || '-'}</td>
                       <td className="px-4 py-2 text-sm">
-                        {req.estimatedCostEur ? `${req.estimatedCostEur.toFixed(4)} EUR` : '-'}
+                        {req.estimatedCostEur ? `${Number(req.estimatedCostEur).toFixed(4)} EUR` : '-'}
                       </td>
                       <td className="px-4 py-2 text-sm">
                         <span
