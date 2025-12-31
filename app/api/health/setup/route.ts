@@ -59,7 +59,7 @@ export async function GET() {
 
     // Check Cron health
     const lastCronRun = await prisma.cronRunLog.findFirst({
-      where: { jobName: 'run-alerts' },
+      where: { cronName: 'run-alerts' },
       orderBy: { ranAt: 'desc' },
       select: { ranAt: true, status: true },
     })
