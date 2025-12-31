@@ -12,8 +12,18 @@ export async function GET() {
       return NextResponse.json({ error: 'No active organization' }, { status: 400 })
     }
 
+    // Fetch org with CUR fields
+    const orgWithCur = await prisma.organization.findUnique({
+      where: { id: activeOrg.id },
+      select: {
+        awsCurEnabled: true,
+        awsCurBucket: true,
+        aiGatewayEnabled: true,
+      },
+    })
+
     // Check AWS CUR
-    const awsCurConfigured = activeOrg.awsCurEnabled && !!activeOrg.awsCurBucket
+    const awsCurConfigured = orgWithCur?.awsCurEnabled && !!orgWithCur?.awsCurBucket
     const lastCurBatch = await prisma.ingestionBatch.findFirst({
       where: { orgId: activeOrg.id },
       orderBy: { finishedAt: 'desc' },
@@ -25,7 +35,7 @@ export async function GET() {
       : false
 
     // Check AI Gateway
-    const aiGatewayConfigured = !!process.env.OPENAI_API_KEY || activeOrg.aiGatewayEnabled
+    const aiGatewayConfigured = !!process.env.OPENAI_API_KEY || orgWithCur?.aiGatewayEnabled || false
     const hasAiPolicies = await prisma.aiPolicy.count({
       where: { orgId: activeOrg.id, enabled: true },
     }) > 0
