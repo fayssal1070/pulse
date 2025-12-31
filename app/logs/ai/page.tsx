@@ -14,6 +14,8 @@ export default async function AiLogsPage() {
   if (!activeOrg) {
     const { redirect } = await import('next/navigation')
     redirect('/organizations/new')
+    // This line will never execute, but TypeScript doesn't know that
+    throw new Error('No active organization')
   }
 
   const activeOrgId = activeOrg.id
