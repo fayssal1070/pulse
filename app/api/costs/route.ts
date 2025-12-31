@@ -155,10 +155,15 @@ export async function GET(request: NextRequest) {
         }
 
         const key = keyParts.join('|')
-        const existing = grouped.get(key) || { amountEur: 0, amountUsd: 0, count: 0 }
+        const existing = grouped.get(key) || { amountEur: 0, amountUsd: null as number | null, count: 0 }
+        const eventAmountUsd = event.amountUsd ? Number(event.amountUsd) : null
         grouped.set(key, {
           amountEur: existing.amountEur + Number(event.amountEur),
-          amountUsd: existing.amountUsd + (event.amountUsd ? Number(event.amountUsd) : 0),
+          amountUsd: existing.amountUsd !== null && eventAmountUsd !== null
+            ? existing.amountUsd + eventAmountUsd
+            : eventAmountUsd !== null
+              ? eventAmountUsd
+              : existing.amountUsd,
           count: existing.count + 1,
         })
       }
