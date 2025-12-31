@@ -48,8 +48,6 @@ export default async function DashboardPage({
     redirect('/onboarding')
   }
 
-  const activeOrgId = activeOrg.id
-
   // Fetch executive dashboard data
   const [kpis, dailyTrend, topUsers, topTeams, topProjects, topApps, topClients, recommendations] = await Promise.all([
     getExecutiveKPIs(activeOrgId),
