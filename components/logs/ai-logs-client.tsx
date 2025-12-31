@@ -164,7 +164,7 @@ export default function AiLogsClient({ orgId }: { orgId: string }) {
                         {log.totalTokens?.toLocaleString() || '-'}
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        {log.estimatedCostEur ? `${log.estimatedCostEur.toFixed(4)} EUR` : '-'}
+                        {log.estimatedCostEur ? `${Number(log.estimatedCostEur).toFixed(4)} EUR` : '-'}
                       </td>
                       <td className="px-4 py-3 text-sm">
                         {log.latencyMs ? `${log.latencyMs}ms` : '-'}
