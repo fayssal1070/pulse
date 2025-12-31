@@ -3,7 +3,6 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { getActiveOrganization } from '@/lib/active-org'
 import { getUserRole } from '@/lib/auth/rbac'
 import { prisma } from '@/lib/prisma'
-import { Decimal } from '@prisma/client/runtime/library'
 
 export async function GET(request: NextRequest) {
   try {
