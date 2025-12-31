@@ -36,24 +36,18 @@ export default async function DashboardPage({
   const isAdminUser = await isAdmin()
 
   // Redirect to onboarding if no org or onboarding not completed
-  let onboardingStatus = null
-  if (activeOrg) {
-    onboardingStatus = await getOnboardingStatus(activeOrg.id)
-    if (!onboardingStatus.completed) {
-      const { redirect } = await import('next/navigation')
-      redirect('/onboarding')
-    }
-  } else {
-    // No active org - redirect to onboarding to create one
+  if (!activeOrg) {
     const { redirect } = await import('next/navigation')
     redirect('/onboarding')
   }
 
-  const activeOrgId = activeOrg?.id || null
-
-  if (!activeOrgId) {
-    return null
+  let onboardingStatus = await getOnboardingStatus(activeOrg.id)
+  if (!onboardingStatus.completed) {
+    const { redirect } = await import('next/navigation')
+    redirect('/onboarding')
   }
+
+  const activeOrgId = activeOrg.id
 
   // Fetch executive dashboard data
   const [kpis, dailyTrend, topUsers, topTeams, topProjects, topApps, topClients, recommendations] = await Promise.all([

@@ -1,6 +1,6 @@
 import { requireAuth } from '@/lib/auth-helpers'
 import { getUserOrganizations } from '@/lib/organizations'
-import { getActiveOrganization } from '@/lib/active-org'
+import { requireActiveOrgOrRedirect } from '@/lib/organizations/require-active-org'
 import { requireRole, canManageBudgets } from '@/lib/auth/rbac'
 import { redirect } from 'next/navigation'
 import AppShell from '@/components/app-shell'
@@ -9,11 +9,7 @@ import BudgetsList from '@/components/budgets/budgets-list'
 export default async function BudgetsPage() {
   const user = await requireAuth()
   const organizations = await getUserOrganizations(user.id)
-  const activeOrg = await getActiveOrganization(user.id)
-
-  if (!activeOrg) {
-    redirect('/onboarding')
-  }
+  const activeOrg = await requireActiveOrgOrRedirect(user.id, { nextPath: '/budgets' })
 
   // Check RBAC: admin, finance, manager can view budgets
   try {

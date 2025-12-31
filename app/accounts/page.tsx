@@ -1,6 +1,6 @@
 import { requireAuth } from '@/lib/auth-helpers'
 import { getUserOrganizations } from '@/lib/organizations'
-import { getActiveOrganization } from '@/lib/active-org'
+import { requireActiveOrgOrRedirect } from '@/lib/organizations/require-active-org'
 import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import AppShell from '@/components/app-shell'
@@ -13,7 +13,7 @@ import { isAdmin } from '@/lib/admin-helpers'
 export default async function AccountsPage() {
   const user = await requireAuth()
   const organizations = await getUserOrganizations(user.id)
-  const activeOrg = await getActiveOrganization(user.id)
+  const activeOrg = await requireActiveOrgOrRedirect(user.id, { nextPath: '/accounts' })
   const isAdminUser = await isAdmin()
 
   if (organizations.length === 0) {
@@ -40,17 +40,16 @@ export default async function AccountsPage() {
 
   // Get CUR status for active org
   let curStatus = null
-  if (activeOrg) {
-    const latestBatch = await prisma.ingestionBatch.findFirst({
-      where: {
-        orgId: activeOrg.id,
-        source: 'AWS_CUR',
-      },
-      orderBy: { startedAt: 'desc' },
-    })
-    const curAccount = await prisma.cloudAccount.findFirst({
-      where: {
-        orgId: activeOrg.id,
+  const latestBatch = await prisma.ingestionBatch.findFirst({
+    where: {
+      orgId: activeOrg.id,
+      source: 'AWS_CUR',
+    },
+    orderBy: { startedAt: 'desc' },
+  })
+  const curAccount = await prisma.cloudAccount.findFirst({
+    where: {
+      orgId: activeOrg.id,
         provider: 'AWS',
         connectionType: 'CUR',
       },
@@ -118,17 +117,15 @@ export default async function AccountsPage() {
               </p>
             </div>
             <div className="flex items-center space-x-3">
-              {activeOrg && isAdminUser && (
+              {isAdminUser && (
                 <SyncCurButton orgId={activeOrg.id} />
               )}
-              {activeOrg && (
-                <Link
-                  href={`/organizations/${activeOrg.id}/cloud-accounts/connect/aws`}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
-                >
-                  + Connect AWS
-                </Link>
-              )}
+              <Link
+                href={`/organizations/${activeOrg.id}/cloud-accounts/connect/aws`}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+              >
+                + Connect AWS
+              </Link>
             </div>
           </div>
 

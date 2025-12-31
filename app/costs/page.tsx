@@ -1,6 +1,6 @@
 import { requireAuth } from '@/lib/auth-helpers'
 import { getUserOrganizations } from '@/lib/organizations'
-import { getActiveOrganization } from '@/lib/active-org'
+import { requireActiveOrgOrRedirect } from '@/lib/organizations/require-active-org'
 import { isAdmin } from '@/lib/admin-helpers'
 import AppShell from '@/components/app-shell'
 import CostsClient from '@/components/costs/costs-client'
@@ -8,22 +8,13 @@ import CostsClient from '@/components/costs/costs-client'
 export default async function CostsPage() {
   const user = await requireAuth()
   const organizations = await getUserOrganizations(user.id)
-  const activeOrg = await getActiveOrganization(user.id)
+  const activeOrg = await requireActiveOrgOrRedirect(user.id, { nextPath: '/costs' })
   const isAdminUser = await isAdmin()
-
-  if (!activeOrg) {
-    const { redirect } = await import('next/navigation')
-    redirect('/organizations/new')
-    // This line will never execute, but TypeScript doesn't know that
-    throw new Error('No active organization')
-  }
-
-  const activeOrgId = activeOrg.id
 
   return (
     <AppShell
       organizations={organizations}
-      activeOrgId={activeOrgId}
+      activeOrgId={activeOrg.id}
       commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
       env={process.env.VERCEL_ENV}
       isAdmin={isAdminUser}
@@ -34,7 +25,7 @@ export default async function CostsPage() {
             <h2 className="text-2xl font-bold text-gray-900">Cost Events</h2>
             <p className="text-sm text-gray-500 mt-1">Unified view of AWS and AI costs</p>
           </div>
-          <CostsClient orgId={activeOrgId} />
+          <CostsClient orgId={activeOrg.id} />
         </div>
       </div>
     </AppShell>
