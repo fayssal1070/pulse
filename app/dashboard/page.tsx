@@ -41,7 +41,8 @@ export default async function DashboardPage({
     redirect('/onboarding')
   }
 
-  let onboardingStatus = await getOnboardingStatus(activeOrg.id)
+  const activeOrgId = activeOrg.id
+  let onboardingStatus = await getOnboardingStatus(activeOrgId)
   if (!onboardingStatus.completed) {
     const { redirect } = await import('next/navigation')
     redirect('/onboarding')

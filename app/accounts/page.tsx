@@ -39,7 +39,6 @@ export default async function AccountsPage() {
   })
 
   // Get CUR status for active org
-  let curStatus = null
   const latestBatch = await prisma.ingestionBatch.findFirst({
     where: {
       orgId: activeOrg.id,
@@ -50,20 +49,26 @@ export default async function AccountsPage() {
   const curAccount = await prisma.cloudAccount.findFirst({
     where: {
       orgId: activeOrg.id,
-        provider: 'AWS',
-        connectionType: 'CUR',
-      },
-      select: {
-        lastCurSyncAt: true,
-        lastCurSyncError: true,
-      },
-    })
-    curStatus = {
-      enabled: !!activeOrg?.awsCurEnabled,
-      lastBatch: latestBatch,
-      lastSyncedAt: curAccount?.lastCurSyncAt,
-      lastError: curAccount?.lastCurSyncError,
-    }
+      provider: 'AWS',
+      connectionType: 'CUR',
+    },
+    select: {
+      lastCurSyncAt: true,
+      lastCurSyncError: true,
+    },
+  })
+  
+  // Fetch org with CUR fields to check if enabled
+  const orgWithCur = await prisma.organization.findUnique({
+    where: { id: activeOrg.id },
+    select: { awsCurEnabled: true },
+  })
+  
+  const curStatus = {
+    enabled: !!orgWithCur?.awsCurEnabled,
+    lastBatch: latestBatch,
+    lastSyncedAt: curAccount?.lastCurSyncAt,
+    lastError: curAccount?.lastCurSyncError,
   }
 
   // Group accounts by organization
@@ -101,7 +106,7 @@ export default async function AccountsPage() {
   return (
     <AppShell 
       organizations={organizations} 
-      activeOrgId={activeOrg?.id || null} 
+      activeOrgId={activeOrg.id} 
       hasActiveAWS={hasActiveAWS}
       commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
       env={process.env.VERCEL_ENV}
