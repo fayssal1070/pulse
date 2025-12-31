@@ -16,10 +16,12 @@ export default async function AiLogsPage() {
     redirect('/organizations/new')
   }
 
+  const activeOrgId = activeOrg.id
+
   return (
     <AppShell
       organizations={organizations}
-      activeOrgId={activeOrg.id}
+      activeOrgId={activeOrgId}
       commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
       env={process.env.VERCEL_ENV}
       isAdmin={isAdminUser}
@@ -30,7 +32,7 @@ export default async function AiLogsPage() {
             <h2 className="text-2xl font-bold text-gray-900">AI Request Logs</h2>
             <p className="text-sm text-gray-500 mt-1">Audit trail of all AI Gateway requests</p>
           </div>
-          <AiLogsClient orgId={activeOrg.id} />
+          <AiLogsClient orgId={activeOrgId} />
         </div>
       </div>
     </AppShell>

@@ -16,10 +16,12 @@ export default async function CostsPage() {
     redirect('/organizations/new')
   }
 
+  const activeOrgId = activeOrg.id
+
   return (
     <AppShell
       organizations={organizations}
-      activeOrgId={activeOrg.id}
+      activeOrgId={activeOrgId}
       commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
       env={process.env.VERCEL_ENV}
       isAdmin={isAdminUser}
@@ -30,7 +32,7 @@ export default async function CostsPage() {
             <h2 className="text-2xl font-bold text-gray-900">Cost Events</h2>
             <p className="text-sm text-gray-500 mt-1">Unified view of AWS and AI costs</p>
           </div>
-          <CostsClient orgId={activeOrg.id} />
+          <CostsClient orgId={activeOrgId} />
         </div>
       </div>
     </AppShell>
