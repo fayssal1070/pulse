@@ -182,14 +182,12 @@ export default async function AccountsPage() {
           {Object.keys(accountsByOrg).length === 0 ? (
             <div className="bg-white rounded-lg shadow p-12 text-center">
               <p className="text-gray-500 mb-4">No cloud accounts found.</p>
-              {activeOrg && (
-                <Link
-                  href={`/organizations/${activeOrg.id}/cloud-accounts/connect/aws`}
-                  className="text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  Connect your first AWS account →
-                </Link>
-              )}
+              <Link
+                href={`/organizations/${activeOrg.id}/cloud-accounts/connect/aws`}
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Connect your first AWS account →
+              </Link>
             </div>
           ) : (
             <div className="space-y-6">
