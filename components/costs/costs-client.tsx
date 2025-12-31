@@ -212,7 +212,7 @@ export default function CostsClient({ orgId }: { orgId: string }) {
                               .join(', ')}
                           </td>
                           <td className="px-4 py-3 text-sm font-semibold">
-                            {item.amountEur.toFixed(2)} EUR
+                            {Number(item.amountEur).toFixed(2)} EUR
                           </td>
                           <td className="px-4 py-3 text-sm">{item.count}</td>
                         </>
@@ -225,7 +225,7 @@ export default function CostsClient({ orgId }: { orgId: string }) {
                           <td className="px-4 py-3 text-sm">{item.provider || '-'}</td>
                           <td className="px-4 py-3 text-sm">{item.service || '-'}</td>
                           <td className="px-4 py-3 text-sm font-semibold">
-                            {item.amountEur.toFixed(2)} EUR
+                            {Number(item.amountEur).toFixed(2)} EUR
                           </td>
                         </>
                       )}
