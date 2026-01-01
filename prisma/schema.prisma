@@ -93,13 +93,16 @@ model AlertRule {
   id              String       @id @default(cuid())
   orgId           String
   name            String
-  type            String // "MONTHLY_BUDGET" | "DAILY_SPIKE"
+  type            String // "DAILY_SPIKE" | "TOP_CONSUMER_SHARE" | "CUR_STALE" | "NO_BUDGETS" | "BUDGET_STATUS" | "MONTHLY_BUDGET" (legacy)
   enabled         Boolean      @default(true)
-  thresholdEUR    Float
+  thresholdEUR    Float? // Optional for some rule types
   spikePercent    Float? // For DAILY_SPIKE (e.g., 50 for 50%)
+  topSharePercent Float? // For TOP_CONSUMER_SHARE (e.g., 30 for 30%)
   lookbackDays    Int          @default(7) // For DAILY_SPIKE baseline
+  providerFilter  String? // "AWS" | "AI" | "TOTAL" | null (all)
   notifyEmail     Boolean      @default(false)
   cooldownHours   Int          @default(24)
+  createdByUserId String?
   lastTriggeredAt DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -117,6 +120,7 @@ model AlertEvent {
   triggeredAt DateTime  @default(now())
   periodStart DateTime
   periodEnd   DateTime
+  severity    String    @default("INFO") // "INFO" | "WARN" | "CRITICAL"
   amountEUR   Float
   message     String
   metadata    String? // JSON string for additional data
@@ -125,6 +129,7 @@ model AlertEvent {
   @@index([orgId])
   @@index([alertId])
   @@index([orgId, triggeredAt])
+  @@index([orgId, severity])
 }
 
 model InAppNotification {

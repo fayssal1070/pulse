@@ -185,8 +185,8 @@ export default async function OrganizationPage({
                         <p className="font-medium text-gray-900">Alert Rule</p>
                         <p className="text-sm text-gray-500">
                           {alert.type === 'MONTHLY_BUDGET'
-                            ? `Monthly budget: ${alert.thresholdEUR.toFixed(2)} EUR`
-                            : `Daily spike: ${alert.spikePercent ? `${alert.spikePercent}%` : ''} ${alert.thresholdEUR > 0 ? `or ${alert.thresholdEUR.toFixed(2)} EUR` : ''}`}
+                            ? `Monthly budget: ${alert.thresholdEUR ? `${alert.thresholdEUR.toFixed(2)} EUR` : ''} EUR`
+                            : `Daily spike: ${alert.spikePercent ? `${alert.spikePercent}%` : ''} ${alert.thresholdEUR && alert.thresholdEUR > 0 ? `or ${alert.thresholdEUR.toFixed(2)} EUR` : ''}`}
                         </p>
                       </div>
                       <div className="text-right">

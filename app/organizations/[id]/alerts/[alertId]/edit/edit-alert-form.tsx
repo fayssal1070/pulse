@@ -11,7 +11,7 @@ interface EditAlertFormProps {
     name: string
     type: string
     enabled: boolean
-    thresholdEUR: number
+    thresholdEUR: number | null
     spikePercent: number | null
     lookbackDays: number
     cooldownHours: number
@@ -23,7 +23,7 @@ export default function EditAlertForm({ organizationId, alert }: EditAlertFormPr
   const router = useRouter()
   const [name, setName] = useState(alert.name)
   const [type, setType] = useState<'MONTHLY_BUDGET' | 'DAILY_SPIKE'>(alert.type as 'MONTHLY_BUDGET' | 'DAILY_SPIKE')
-  const [thresholdEUR, setThresholdEUR] = useState(alert.thresholdEUR.toString())
+  const [thresholdEUR, setThresholdEUR] = useState(alert.thresholdEUR?.toString() || '')
   const [spikePercent, setSpikePercent] = useState(alert.spikePercent?.toString() || '')
   const [lookbackDays, setLookbackDays] = useState(alert.lookbackDays.toString())
   const [cooldownHours, setCooldownHours] = useState(alert.cooldownHours.toString())
@@ -44,7 +44,7 @@ export default function EditAlertForm({ organizationId, alert }: EditAlertFormPr
         body: JSON.stringify({
           name,
           type,
-          thresholdEUR: parseFloat(thresholdEUR),
+          thresholdEUR: thresholdEUR ? parseFloat(thresholdEUR) : null,
           spikePercent: type === 'DAILY_SPIKE' && spikePercent ? parseFloat(spikePercent) : null,
           lookbackDays: parseInt(lookbackDays) || 7,
           cooldownHours: parseInt(cooldownHours) || 24,
@@ -124,19 +124,20 @@ export default function EditAlertForm({ organizationId, alert }: EditAlertFormPr
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label htmlFor="thresholdEUR" className="block text-sm font-medium text-gray-700">
-              Threshold (EUR) *
-            </label>
-            <input
-              id="thresholdEUR"
-              type="number"
-              step="0.01"
-              min="0.01"
-              required
-              value={thresholdEUR}
-              onChange={(e) => setThresholdEUR(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
+            <div>
+              <label htmlFor="thresholdEUR" className="block text-sm font-medium text-gray-700">
+                Threshold (EUR)
+              </label>
+              <input
+                id="thresholdEUR"
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={thresholdEUR}
+                onChange={(e) => setThresholdEUR(e.target.value)}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
           </div>
 
           {type === 'DAILY_SPIKE' && (

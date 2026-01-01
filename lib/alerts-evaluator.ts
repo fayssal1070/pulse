@@ -20,7 +20,7 @@ export async function evaluateMonthlyBudgetAlert(
     id: string
     orgId: string
     name: string
-    thresholdEUR: number
+    thresholdEUR: number | null
     lastTriggeredAt: Date | null
     cooldownHours: number
   }
@@ -42,6 +42,10 @@ export async function evaluateMonthlyBudgetAlert(
   const spentMTD = await getCurrentMonthCosts(alert.orgId)
 
   // Check thresholds: 50%, 80%, 100%
+  if (!alert.thresholdEUR) {
+    return null // No threshold set
+  }
+
   const thresholds = [
     { percent: 50, value: alert.thresholdEUR * 0.5 },
     { percent: 80, value: alert.thresholdEUR * 0.8 },
@@ -104,7 +108,7 @@ export async function evaluateDailySpikeAlert(
     id: string
     orgId: string
     name: string
-    thresholdEUR: number
+    thresholdEUR: number | null
     spikePercent: number | null
     lookbackDays: number
     lastTriggeredAt: Date | null
@@ -164,7 +168,7 @@ export async function evaluateDailySpikeAlert(
   const baselineAverage = baselineTotal / alert.lookbackDays
 
   // Check if triggered by fixed threshold
-  if (todayAmount >= alert.thresholdEUR) {
+  if (alert.thresholdEUR && todayAmount >= alert.thresholdEUR) {
     const message = `${alert.name}: Daily threshold exceeded. Today's spend: ${todayAmount.toFixed(2)} EUR (threshold: ${alert.thresholdEUR.toFixed(2)} EUR).`
 
     return {
@@ -261,7 +265,7 @@ export async function evaluateOrganizationAlerts(orgId: string): Promise<AlertEv
         id: alert.id,
         orgId: alert.orgId,
         name: alert.name,
-        thresholdEUR: alert.thresholdEUR,
+        thresholdEUR: alert.thresholdEUR || 0,
         spikePercent: alert.spikePercent,
         lookbackDays: alert.lookbackDays,
         lastTriggeredAt: alert.lastTriggeredAt,

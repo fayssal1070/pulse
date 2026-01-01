@@ -116,7 +116,11 @@ export default async function AlertsPage({
                           {alert.type === 'MONTHLY_BUDGET' ? (
                             <p>
                               Alert when spending reaches 50%, 80%, or 100% of{' '}
-                              <span className="font-medium">{alert.thresholdEUR.toFixed(2)} EUR</span>{' '}
+                              {alert.thresholdEUR ? (
+                                <span className="font-medium">{alert.thresholdEUR.toFixed(2)} EUR</span>
+                              ) : (
+                                <span className="font-medium">budget</span>
+                              )}{' '}
                               monthly budget
                             </p>
                           ) : (
@@ -128,8 +132,8 @@ export default async function AlertsPage({
                                   {alert.lookbackDays}-day baseline
                                 </>
                               )}
-                              {alert.spikePercent && alert.thresholdEUR > 0 && ' or '}
-                              {alert.thresholdEUR > 0 && (
+                              {alert.spikePercent && alert.thresholdEUR && alert.thresholdEUR > 0 && ' or '}
+                              {alert.thresholdEUR && alert.thresholdEUR > 0 && (
                                 <>
                                   exceeds <span className="font-medium">{alert.thresholdEUR.toFixed(2)} EUR</span>
                                 </>

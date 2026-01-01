@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { dispatchAlertsForOrg } from '@/lib/alerts/dispatch'
+import { dispatchRulesForOrg } from '@/lib/alerts/dispatch-rules'
 
 /**
  * Cron job to run alerts dispatch for all organizations
@@ -36,8 +37,13 @@ export async function POST(request: Request) {
       select: { id: true },
     })
 
-    const results = await Promise.allSettled(
+    // Dispatch both budget alerts (PR5) and rule-based alerts (PR9)
+    const budgetResults = await Promise.allSettled(
       organizations.map((org) => dispatchAlertsForOrg(org.id))
+    )
+
+    const rulesResults = await Promise.allSettled(
+      organizations.map((org) => dispatchRulesForOrg(org.id))
     )
 
     // Aggregate results
@@ -47,16 +53,29 @@ export async function POST(request: Request) {
     let totalSentInApp = 0
     const allErrors: string[] = []
 
-    for (const result of results) {
+    // Process budget alerts
+    for (const result of budgetResults) {
       if (result.status === 'fulfilled') {
         totalTriggered += result.value.triggered
         totalSentEmail += result.value.sentEmail
         totalSentTelegram += result.value.sentTelegram
-        // Count InAppNotifications created (1 per triggered alert)
         totalSentInApp += result.value.triggered
         allErrors.push(...result.value.errors)
       } else {
-        allErrors.push(result.reason?.message || 'Unknown error')
+        allErrors.push(`Budget alerts: ${result.reason?.message || 'Unknown error'}`)
+      }
+    }
+
+    // Process rule-based alerts
+    for (const result of rulesResults) {
+      if (result.status === 'fulfilled') {
+        totalTriggered += result.value.triggered
+        totalSentEmail += result.value.sentEmail
+        totalSentTelegram += result.value.sentTelegram
+        totalSentInApp += result.value.triggered
+        allErrors.push(...result.value.errors)
+      } else {
+        allErrors.push(`Rule alerts: ${result.reason?.message || 'Unknown error'}`)
       }
     }
 

@@ -82,7 +82,7 @@ async function checkAlerts() {
       const total = result._sum.amountEUR || 0
 
       // Si dépassement et pas déjà triggered (cooldown check)
-      const shouldTrigger = total > rule.thresholdEUR && rule.enabled
+      const shouldTrigger = rule.thresholdEUR && total > rule.thresholdEUR && rule.enabled
       const isInCooldown = rule.lastTriggeredAt && 
         (new Date().getTime() - rule.lastTriggeredAt.getTime()) < (rule.cooldownHours * 60 * 60 * 1000)
 
@@ -95,11 +95,11 @@ async function checkAlerts() {
         })
 
         console.log(
-          `✓ Alert rule triggered for "${org.name}": ${total.toFixed(2)} EUR > ${rule.thresholdEUR.toFixed(2)} EUR (${periodDays} days)`
+          `✓ Alert rule triggered for "${org.name}": ${total.toFixed(2)} EUR > ${rule.thresholdEUR?.toFixed(2) || 'N/A'} EUR (${periodDays} days)`
         )
 
         // Envoyer notification Telegram
-        if (org.telegramBotToken && org.telegramChatId) {
+        if (org.telegramBotToken && org.telegramChatId && rule.thresholdEUR !== null) {
           const message = formatAlertMessage(
             org.name,
             rule.thresholdEUR,
@@ -119,13 +119,13 @@ async function checkAlerts() {
         } else {
           console.log(`  ℹ Telegram not configured for "${org.name}", skipping notification`)
         }
-      } else if (total > rule.thresholdEUR && isInCooldown) {
+      } else if (rule.thresholdEUR && total > rule.thresholdEUR && isInCooldown) {
         console.log(
           `  Alert rule in cooldown for "${org.name}": ${total.toFixed(2)} EUR > ${rule.thresholdEUR.toFixed(2)} EUR`
         )
       } else {
         console.log(
-          `  Alert rule OK for "${org.name}": ${total.toFixed(2)} EUR <= ${rule.thresholdEUR.toFixed(2)} EUR (${periodDays} days)`
+          `  Alert rule OK for "${org.name}": ${total.toFixed(2)} EUR <= ${rule.thresholdEUR?.toFixed(2) || 'N/A'} EUR (${periodDays} days)`
         )
       }
     }
