@@ -68,3 +68,4 @@ Après suppression de `NODE_TLS_REJECT_UNAUTHORIZED` :
 - Le build Vercel ne doit plus afficher le warning : `Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure`
 - Les appels Telegram (si configurés) doivent fonctionner avec TLS sécurisé
 
+

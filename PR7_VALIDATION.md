@@ -1,165 +1,334 @@
-# PR7 Validation Checklist
+# PR7 Validation - Costs Page
 
-## Setup & Configuration
+## Overview
+This document describes how to validate the costs page implementation with filters, breakdowns, events table, and export functionality.
 
-1. **Setup Checklist on Dashboard**
-   - Navigate to `/dashboard`
-   - Verify "Setup Status" panel appears at the top
-   - Check that incomplete items show action links
-   - Verify completed items show ✓
+## Prerequisites
+- User must be authenticated
+- User must have an active organization
+- CostEvents should exist in the database (AWS or AI)
 
-2. **Health Endpoint**
-   - `GET /api/health/setup` (authenticated)
-   - Should return JSON with status for: awsCur, aiGateway, budgets, notifications, cron
+## Test Cases
 
-## AI Gateway Dimensions
+### 1. Access the Costs Page
+**URL:** `/costs`
 
-3. **Test AI Request with Headers**
-   ```bash
-   curl -X POST https://your-domain.com/api/ai/request \
-     -H "Content-Type: application/json" \
-     -H "x-pulse-team: team-123" \
-     -H "x-pulse-project: project-456" \
-     -H "x-pulse-app: app-789" \
-     -H "Cookie: next-auth.session-token=..." \
-     -d '{
-       "model": "gpt-4o-mini",
-       "prompt": "Hello"
-     }'
-   ```
-   - Verify request succeeds
-   - Check `/logs/ai` - log should show team/project/app IDs
+**Expected:**
+- Page loads without errors
+- Header shows "Costs" title and "Track and analyze AWS and AI costs" subtitle
+- Export CSV button is visible in the header
+- Filters section is visible with:
+  - Date Range dropdown (Last 7 days, Last 30 days, Month to Date, Last Month, Custom)
+  - Provider dropdown (All Providers, AWS, OpenAI, Anthropic, Google)
+  - Search input
+  - Dimension tabs (Users, Teams, Projects, Apps, Clients, Models)
+- KPI cards show: AI Cost, AWS Cost, Total Cost, MoM Delta, Today
+- Breakdown panel shows top 10 items for selected dimension
+- Events table shows paginated cost events
 
-4. **Test AI Request with Body Dimensions**
-   ```bash
-   curl -X POST https://your-domain.com/api/ai/request \
-     -H "Content-Type: application/json" \
-     -H "Cookie: next-auth.session-token=..." \
-     -d '{
-       "model": "gpt-4o-mini",
-       "prompt": "Hello",
-       "teamId": "team-123",
-       "projectId": "project-456",
-       "appId": "app-789",
-       "clientId": "client-abc"
-     }'
-   ```
-   - Verify request succeeds
-   - Check `/logs/ai` - log should show all dimensions
+**Validation:**
+```bash
+# Check page loads
+curl -I https://your-domain.com/costs
+```
 
-5. **Simulation Mode (Dev Only)**
-   - Set `PULSE_SIMULATE_AI=true` in env
-   - Make AI request
-   - Verify response contains "[SIMULATED]" prefix
-   - Verify CostEvent and AiRequestLog are still created
+### 2. Test Filters
 
-## AI Logs Page
+#### 2.1 Date Range Filter
+- Select "Last 7 days" → Events should filter to last 7 days
+- Select "Month to Date" → Events should filter to current month
+- Select "Custom" → Start Date and End Date inputs appear
+- Set custom dates → Events should filter to date range
 
-6. **Access AI Logs**
-   - Navigate to `/logs/ai`
-   - Verify table displays recent AI requests
-   - Check columns: Time, Model, Tokens, Cost, Latency, Status
+#### 2.2 Provider Filter
+- Select "AWS" → Only AWS events shown
+- Select "OpenAI" → Only OpenAI events shown
+- Select "All Providers" → All events shown
 
-7. **Filter AI Logs**
-   - Set date range filter
-   - Set model filter (e.g., "gpt-4o-mini")
-   - Set status filter (success/error/blocked)
-   - Verify results update correctly
+#### 2.3 Search Filter
+- Type "gpt" in search → Events filtered by model/provider/service containing "gpt"
+- Type "EC2" → Events filtered by service containing "EC2"
 
-8. **Export AI Logs**
-   - Click "Export CSV" button
-   - Verify CSV downloads with correct filename
-   - Verify CSV contains expected columns
+#### 2.4 Dimension Tabs
+- Click "Users" tab → Breakdown shows top users
+- Click "Teams" tab → Breakdown shows top teams
+- Click "Models" tab → Breakdown shows top models
 
-9. **RBAC on AI Logs**
-   - Login as regular user (role: user)
-   - Navigate to `/logs/ai`
-   - Verify only own logs are visible
-   - Login as admin/finance/manager
-   - Verify all org logs are visible
+**Validation:**
+- URL should update with query parameters
+- Data should refresh when filters change
+- Loading states should appear during fetch
 
-## Costs Page
+### 3. Test Breakdown Panel
 
-10. **Access Costs**
-    - Navigate to `/costs`
-    - Verify table displays CostEvents (AWS + AI)
-    - Check columns: Date, Source, Provider, Service, Amount
+**Expected:**
+- Shows top 10 items for selected dimension
+- Each item shows:
+  - Name (or "Unknown" if empty)
+  - Amount in EUR
+  - Percentage of total
+  - Event count
 
-11. **Filter Costs**
-    - Set source filter (AWS/AI)
-    - Set date range
-    - Set provider filter
-    - Verify results update correctly
+**Test:**
+1. Navigate to `/costs`
+2. Click different dimension tabs
+3. Verify breakdown updates
+4. Verify percentages sum to ~100% (may be less if top 10 doesn't cover all)
 
-12. **Group By Costs**
-    - Select "Group By: Day"
-    - Verify results are aggregated by day
-    - Select "Group By: Source"
-    - Verify results are aggregated by source
-    - Select "Group By: Provider"
-    - Verify results are aggregated by provider
+### 4. Test Events Table
 
-13. **Export Costs**
-    - Click "Export CSV" button
-    - Verify CSV downloads with correct filename
-    - Verify CSV contains expected columns
+**Expected:**
+- Table columns: Date, Provider, Model, Amount EUR, User, Team, Project, App, Client, Source, Id
+- Shows "-" for null values
+- Pagination controls at bottom
+- Page size selector (25, 50, 100)
 
-14. **RBAC on Costs**
-    - Login as regular user (role: user)
-    - Navigate to `/costs`
-    - Verify only own costs are visible (filtered by userId in dimensions)
-    - Login as admin/finance/manager
-    - Verify all org costs are visible
+**Test:**
+1. Navigate to `/costs`
+2. Verify table shows events
+3. Click "Next" → Next page loads
+4. Change page size to 50 → Table shows 50 events per page
+5. Verify pagination info shows correct counts
 
-## Navigation
+### 5. Test Export CSV
 
-15. **Sidebar Navigation**
-    - Verify sidebar contains:
-      - Dashboard
-      - Costs
-      - AI Logs
-      - Cloud Accounts
-      - Budgets
-      - Alerts
-      - Notifications
-      - Team
-      - Settings
-    - Click each link and verify navigation works
+**Expected:**
+- Click "Export CSV" button
+- CSV file downloads with filename: `cost-events-YYYY-MM-DD.csv`
+- CSV contains all events matching current filters
+- CSV headers: Date, Source, Provider, Service, Model, Amount (EUR), Amount (USD), Currency, User ID, Team ID, Project ID, App ID, Client ID, Event ID
 
-## Budget Enforcement
+**Test:**
+1. Navigate to `/costs`
+2. Apply some filters (e.g., dateRange=last7, provider=aws)
+3. Click "Export CSV"
+4. Verify file downloads
+5. Open CSV and verify:
+   - Headers are correct
+   - Data matches filtered events
+   - Dates are in ISO format
+   - Amounts are formatted correctly
 
-16. **Budget Block Test**
-    - Create a budget with `hardLimit: true`, `action: { block: true }`
-    - Set budget to CRITICAL status (exceeded)
-    - Make AI request
-    - Verify request is blocked with 403
-    - Check `/logs/ai` - should show blocked request with status 403
+**Validation:**
+```bash
+# Test export endpoint (requires auth)
+curl -H "Cookie: your-auth-cookie" \
+  "https://your-domain.com/api/costs/export?dateRange=last7&provider=aws" \
+  -o cost-events.csv
+```
 
-## Integration
+### 6. Test Drilldown from Dashboard
 
-17. **End-to-End Test**
-    - Make AI request via `/api/ai/request`
-    - Verify:
-      - Request appears in `/logs/ai`
-      - CostEvent appears in `/costs`
-      - Dashboard KPIs update (if within date range)
-      - Export CSV includes the new request
+**Expected:**
+- Click a row in "Top 5 Consumers" on dashboard
+- Navigate to `/costs` with pre-filled filters:
+  - `dimension` set to the clicked dimension (users/teams/projects/apps/clients)
+  - `userId`/`teamId`/`projectId`/`appId`/`clientId` set to the clicked item's ID
+  - `range=mtd`
+  - `provider=ALL`
 
-## Edge Cases
+**Test:**
+1. Navigate to `/dashboard`
+2. In "Top 5 Consumers" section, click on a user row
+3. Verify redirect to `/costs?dimension=users&userId=...&range=mtd&provider=ALL`
+4. Verify events table shows only events for that user
+5. Verify breakdown shows that user at the top
 
-18. **Empty State**
-    - Navigate to `/logs/ai` with no data
-    - Verify "No logs found" message
-    - Navigate to `/costs` with no data
-    - Verify "No costs found" message
+### 7. Test RBAC (Role-Based Access Control)
 
-19. **Large Dataset**
-    - Test pagination on `/logs/ai` (if >20 logs)
-    - Test pagination on `/costs` (if >50 events)
-    - Verify "Previous" and "Next" buttons work
+#### 7.1 Admin/Finance/Manager
+**Expected:**
+- Can see all cost events
+- Can see all users/teams/projects in breakdown
+- Can export all events
 
-20. **Invalid Filters**
-    - Set invalid date range (end < start)
-    - Verify graceful handling (no crash)
-    - Set invalid model name
-    - Verify results are empty (not error)
+**Test:**
+1. Login as admin/finance/manager
+2. Navigate to `/costs`
+3. Verify all events visible
+4. Verify breakdown shows all users/teams
+
+#### 7.2 User Role
+**Expected:**
+- Can only see their own cost events (filtered by userId in dimensions)
+- Breakdown only shows their own data
+- Export only includes their events
+
+**Test:**
+1. Login as regular user
+2. Navigate to `/costs`
+3. Verify only events with `dimensions.userId === currentUserId` are shown
+4. Verify breakdown only shows the user themselves
+5. Export CSV and verify only user's events included
+
+**Validation:**
+```bash
+# Test API with user role
+# Should only return events where dimensions.userId === user.id
+curl -H "Cookie: user-auth-cookie" \
+  "https://your-domain.com/api/costs/events?dateRange=last30"
+```
+
+### 8. Test Empty States
+
+**Expected:**
+- If no events: "No cost events found" message
+- If no breakdown data: "No data" message
+- KPIs show 0.00 € if no data
+- Page doesn't crash
+
+**Test:**
+1. Use an org with no CostEvents
+2. Navigate to `/costs`
+3. Verify empty states display correctly
+4. Verify no errors in console
+
+### 9. Test Loading States
+
+**Expected:**
+- Loading indicator appears when fetching data
+- Filters remain interactive during load
+- Table shows "Loading..." message
+
+**Test:**
+1. Navigate to `/costs`
+2. Change filters rapidly
+3. Verify loading states appear
+4. Verify no duplicate requests
+
+### 10. Test URL Persistence
+
+**Expected:**
+- Filters are reflected in URL query parameters
+- Refreshing page maintains filters
+- Sharing URL with filters works
+
+**Test:**
+1. Navigate to `/costs`
+2. Apply filters: dateRange=last7, provider=aws, dimension=users
+3. Verify URL: `/costs?dateRange=last7&provider=aws&dimension=users&page=1&pageSize=25`
+4. Refresh page
+5. Verify filters are maintained
+6. Copy URL and open in new tab
+7. Verify filters are applied
+
+## API Endpoints Validation
+
+### GET /api/costs/summary
+```bash
+curl -H "Cookie: auth-cookie" \
+  "https://your-domain.com/api/costs/summary?dateRange=last30&provider=ALL"
+```
+
+**Expected Response:**
+```json
+{
+  "aiCost": 123.45,
+  "awsCost": 678.90,
+  "totalCost": 802.35,
+  "momDelta": 50.25,
+  "momDeltaPercent": 6.7,
+  "todayCost": 12.34
+}
+```
+
+### GET /api/costs/breakdown
+```bash
+curl -H "Cookie: auth-cookie" \
+  "https://your-domain.com/api/costs/breakdown?dimension=users&limit=10&dateRange=last30"
+```
+
+**Expected Response:**
+```json
+{
+  "breakdown": [
+    {
+      "id": "user-123",
+      "name": "user-123",
+      "amountEur": 100.50,
+      "percentage": 12.5,
+      "eventCount": 45
+    }
+  ]
+}
+```
+
+### GET /api/costs/events
+```bash
+curl -H "Cookie: auth-cookie" \
+  "https://your-domain.com/api/costs/events?page=1&pageSize=25&dateRange=last30"
+```
+
+**Expected Response:**
+```json
+{
+  "events": [
+    {
+      "id": "event-123",
+      "occurredAt": "2024-01-15T10:30:00Z",
+      "source": "AI",
+      "provider": "openai",
+      "model": "gpt-4",
+      "amountEur": 0.1234,
+      "userId": "user-123",
+      "teamId": null,
+      "projectId": null,
+      "appId": null,
+      "clientId": null,
+      "service": null
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "pageSize": 25,
+    "totalCount": 100,
+    "totalPages": 4
+  }
+}
+```
+
+### GET /api/costs/export
+```bash
+curl -H "Cookie: auth-cookie" \
+  "https://your-domain.com/api/costs/export?dateRange=last30" \
+  -o cost-events.csv
+```
+
+**Expected:**
+- Content-Type: text/csv
+- Content-Disposition: attachment; filename="cost-events-YYYY-MM-DD.csv"
+- CSV content with headers and data
+
+## Data Test IDs
+
+Verify these test IDs exist in the DOM:
+- `data-testid="costs-page"` - Main container
+- `data-testid="costs-filters"` - Filters section
+- `data-testid="costs-kpis"` - KPI cards
+- `data-testid="costs-breakdown"` - Breakdown panel
+- `data-testid="costs-events-table"` - Events table
+- `data-testid="costs-export"` - Export button
+
+## Performance Checks
+
+1. **Initial Load:** Page should load in < 2 seconds
+2. **Filter Changes:** Data should refresh in < 1 second
+3. **Export:** CSV generation should complete in < 5 seconds for 10k events
+4. **Pagination:** Page changes should be instant
+
+## Known Limitations
+
+1. Dimension filtering (userId, teamId, etc.) is done in memory after fetching all events. For large datasets, this may be slow.
+2. Search is case-insensitive but simple string matching.
+3. Model filtering requires checking dimensions JSON field.
+
+## Success Criteria
+
+✅ All test cases pass
+✅ No console errors
+✅ RBAC enforced correctly
+✅ Export generates valid CSV
+✅ Drilldown from dashboard works
+✅ URL persistence works
+✅ Empty states handled gracefully
+✅ Loading states appear

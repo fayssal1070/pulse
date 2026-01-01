@@ -87,3 +87,4 @@ git log --oneline --all | grep -A 5 "8d610ee"
 # Résultat : 8d610ee est 22 commits en arrière de dc01926
 ```
 
+

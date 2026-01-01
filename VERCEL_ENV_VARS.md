@@ -79,3 +79,4 @@ Après déploiement, vérifier que le build passe :
 - **Fix** : Ajouter `AUTH_SECRET` dans Vercel Environment Variables
 - Générer avec : `openssl rand -base64 32`
 
+

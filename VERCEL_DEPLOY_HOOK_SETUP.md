@@ -81,3 +81,4 @@ Si le Deploy Hook ne fonctionne pas, réparer la liaison Git :
    - Activer "Auto-deploy"
 3. Vérifier dans GitHub → Settings → Webhooks qu'un webhook Vercel existe
 
+

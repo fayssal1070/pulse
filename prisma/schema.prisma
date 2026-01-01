@@ -40,6 +40,7 @@ model Organization {
   awsAssumeRoleArn        String? // Cross-account role ARN
   // AI Gateway configuration
   aiGatewayEnabled        Boolean                  @default(false)
+  aiLogRetentionDays      Int                      @default(90) // Days to retain AI request logs
   alertRules              AlertRule[]
   cloudAccounts           CloudAccount[]
   costRecords             CostRecord[]
@@ -382,17 +383,17 @@ model OrgIntegration {
 // Cron run logs for monitoring (proof of execution)
 model CronRunLog {
   id              String   @id @default(cuid())
-  cronName        String   // e.g., "run-alerts", "sync-aws-cur"
+  cronName        String // e.g., "run-alerts", "sync-aws-cur"
   ranAt           DateTime @default(now()) // Execution timestamp
   status          String   @default("OK") // "OK" | "ERROR"
   orgsProcessed   Int      @default(0)
   alertsTriggered Int      @default(0)
   sentEmail       Int      @default(0)
-  sentTelegram     Int      @default(0)
-  sentInApp        Int      @default(0)
-  durationMs      Int?     // Execution duration in milliseconds
-  errorCount       Int      @default(0)
-  errorSample      String?  // First error message (truncated to 500 chars)
+  sentTelegram    Int      @default(0)
+  sentInApp       Int      @default(0)
+  durationMs      Int? // Execution duration in milliseconds
+  errorCount      Int      @default(0)
+  errorSample     String? // First error message (truncated to 500 chars)
 
   @@index([cronName])
   @@index([ranAt])

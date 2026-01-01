@@ -115,3 +115,4 @@
 - BuildInfoBadge et BuildInfoGlobal vérifient aussi admin + flag
 - Tous les éléments debug sont conditionnels : `isAdmin && NEXT_PUBLIC_UI_DEBUG === "true"`
 
+

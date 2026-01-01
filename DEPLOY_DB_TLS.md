@@ -150,3 +150,4 @@ Navigate to `/admin/debug` (admin only) to see:
 - `FIX_POOLER_CERTIFICATE.md` - Troubleshooting pooler certificate issues
 - `/admin/debug` - Admin debug page to verify connection
 
+

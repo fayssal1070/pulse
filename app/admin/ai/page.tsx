@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import AppShell from '@/components/app-shell'
 import { getUserOrganizations } from '@/lib/organizations'
 import AiAdminPanel from '@/components/ai-admin-panel'
+import Link from 'next/link'
 
 export default async function AdminAIPage() {
   const user = await requireAuth()
@@ -73,9 +74,17 @@ export default async function AdminAIPage() {
     >
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">AI Gateway Admin</h2>
-            <p className="text-sm text-gray-500 mt-1">Manage AI keys, policies, and test requests</p>
+          <div className="mb-6 flex justify-between items-start">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">AI Gateway Admin</h2>
+              <p className="text-sm text-gray-500 mt-1">Manage AI keys, policies, and test requests</p>
+            </div>
+            <Link
+              href="/governance"
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
+            >
+              View Governance
+            </Link>
           </div>
 
           <AiAdminPanel

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { TopConsumer } from '@/lib/cost-events/types'
 
 interface TopConsumersProps {
@@ -12,6 +13,7 @@ interface TopConsumersProps {
 }
 
 export default function TopConsumers({ users, teams, projects, apps, clients }: TopConsumersProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<'user' | 'team' | 'project' | 'app' | 'client'>('user')
 
   const formatCurrency = (amount: number) => {
@@ -34,6 +36,31 @@ export default function TopConsumers({ users, teams, projects, apps, clients }: 
   }
 
   const data = getData()
+
+  const handleRowClick = (consumer: TopConsumer, tab: typeof activeTab) => {
+    const params = new URLSearchParams()
+    params.set('dateRange', 'mtd')
+    params.set('provider', 'ALL')
+    
+    if (tab === 'user') {
+      params.set('dimension', 'users')
+      params.set('userId', consumer.id)
+    } else if (tab === 'team') {
+      params.set('dimension', 'teams')
+      params.set('teamId', consumer.id)
+    } else if (tab === 'project') {
+      params.set('dimension', 'projects')
+      params.set('projectId', consumer.id)
+    } else if (tab === 'app') {
+      params.set('dimension', 'apps')
+      params.set('appId', consumer.id)
+    } else if (tab === 'client') {
+      params.set('dimension', 'clients')
+      params.set('clientId', consumer.id)
+    }
+    
+    router.push(`/costs?${params.toString()}`)
+  }
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
@@ -79,7 +106,11 @@ export default function TopConsumers({ users, teams, projects, apps, clients }: 
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {data.map((consumer) => (
-                <tr key={consumer.id} className="hover:bg-gray-50">
+                <tr
+                  key={consumer.id}
+                  onClick={() => handleRowClick(consumer, activeTab)}
+                  className="hover:bg-gray-50 cursor-pointer"
+                >
                   <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                     {consumer.name || consumer.id || 'Unknown'}
                   </td>
