@@ -1,6 +1,6 @@
 import { requireAuth } from '@/lib/auth-helpers'
 import { getUserOrganizations } from '@/lib/organizations'
-import { getActiveOrganization } from '@/lib/active-org'
+import { requireActiveOrgOrRedirect } from '@/lib/organizations/require-active-org'
 import { getOnboardingStatus } from '@/lib/onboarding'
 import { prisma } from '@/lib/prisma'
 import AppShell from '@/components/app-shell'
@@ -32,15 +32,10 @@ export default async function DashboardPage({
   const params = await searchParams
   const showAdminError = params?.error === 'admin_required'
   const organizations = await getUserOrganizations(user.id)
-  const activeOrg = await getActiveOrganization(user.id)
+  const activeOrg = await requireActiveOrgOrRedirect(user.id, { nextPath: '/dashboard' })
   const isAdminUser = await isAdmin()
 
-  // Redirect to onboarding if no org or onboarding not completed
-  if (!activeOrg) {
-    const { redirect } = await import('next/navigation')
-    redirect('/onboarding')
-  }
-
+  // Redirect to onboarding if onboarding not completed
   const activeOrgId = activeOrg.id
   let onboardingStatus = await getOnboardingStatus(activeOrgId)
   if (!onboardingStatus.completed) {

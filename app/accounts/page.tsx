@@ -10,6 +10,8 @@ import Link from 'next/link'
 import FormattedDate from '@/components/formatted-date'
 import { isAdmin } from '@/lib/admin-helpers'
 
+type AccountRow = Awaited<ReturnType<typeof prisma.cloudAccount.findMany>>[number]
+
 export default async function AccountsPage() {
   const user = await requireAuth()
   const organizations = await getUserOrganizations(user.id)
@@ -20,12 +22,10 @@ export default async function AccountsPage() {
     redirect('/organizations/new')
   }
 
-  // Get all cloud accounts from all organizations user has access to
   const orgIds = organizations.map((o) => o.id)
+
   const allAccounts = await prisma.cloudAccount.findMany({
-    where: {
-      orgId: { in: orgIds },
-    },
+    where: { orgId: { in: orgIds } },
     orderBy: { createdAt: 'desc' },
     include: {
       organization: {
@@ -38,14 +38,11 @@ export default async function AccountsPage() {
     },
   })
 
-  // Get CUR status for active org
   const latestBatch = await prisma.ingestionBatch.findFirst({
-    where: {
-      orgId: activeOrg.id,
-      source: 'AWS_CUR',
-    },
+    where: { orgId: activeOrg.id, source: 'AWS_CUR' },
     orderBy: { startedAt: 'desc' },
   })
+
   const curAccount = await prisma.cloudAccount.findFirst({
     where: {
       orgId: activeOrg.id,
@@ -57,13 +54,12 @@ export default async function AccountsPage() {
       lastCurSyncError: true,
     },
   })
-  
-  // Fetch org with CUR fields to check if enabled
+
   const orgWithCur = await prisma.organization.findUnique({
     where: { id: activeOrg.id },
     select: { awsCurEnabled: true },
   })
-  
+
   const curStatus = {
     enabled: !!orgWithCur?.awsCurEnabled,
     lastBatch: latestBatch,
@@ -71,20 +67,18 @@ export default async function AccountsPage() {
     lastError: curAccount?.lastCurSyncError,
   }
 
-  // Group accounts by organization
   const accountsByOrg = allAccounts.reduce((acc, account) => {
-    const orgId = account.orgId
-    if (!acc[orgId]) {
-      acc[orgId] = {
+    const oid = account.orgId
+    if (!acc[oid]) {
+      acc[oid] = {
         org: account.organization,
-        accounts: [],
+        accounts: [] as AccountRow[],
       }
     }
-    acc[orgId].accounts.push(account)
+    acc[oid].accounts.push(account)
     return acc
-  }, {} as Record<string, { org: { id: string; name: string }; accounts: typeof allAccounts }>)
+  }, {} as Record<string, { org: { id: string; name: string; awsCurEnabled?: boolean | null }; accounts: AccountRow[] }>)
 
-  // Check if there's any active AWS account
   const hasActiveAWS = allAccounts.some(
     (acc) => acc.provider === 'AWS' && acc.connectionType === 'COST_EXPLORER' && acc.status === 'active'
   )
@@ -104,9 +98,9 @@ export default async function AccountsPage() {
   }
 
   return (
-    <AppShell 
-      organizations={organizations} 
-      activeOrgId={activeOrg.id} 
+    <AppShell
+      organizations={organizations}
+      activeOrgId={activeOrg.id}
       hasActiveAWS={hasActiveAWS}
       commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
       env={process.env.VERCEL_ENV}
@@ -117,14 +111,12 @@ export default async function AccountsPage() {
           <div className="mb-6 flex justify-between items-start">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Cloud Accounts</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                Manage cloud accounts across all your organizations
-              </p>
+              <p className="text-sm text-gray-500 mt-1">Manage cloud accounts across all your organizations</p>
             </div>
+
             <div className="flex items-center space-x-3">
-              {isAdminUser && (
-                <SyncCurButton orgId={activeOrg.id} />
-              )}
+              {isAdminUser ? <SyncCurButton orgId={activeOrg.id} /> : null}
+
               <Link
                 href={`/organizations/${activeOrg.id}/cloud-accounts/connect/aws`}
                 className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
@@ -134,56 +126,53 @@ export default async function AccountsPage() {
             </div>
           </div>
 
-          {/* CUR Status */}
-          {curStatus && curStatus.enabled && (
+          {curStatus.enabled ? (
             <div className="mb-6 bg-white rounded-lg shadow p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">AWS CUR Sync Status</h3>
-                  {curStatus.lastSyncedAt && (
+
+                  {curStatus.lastSyncedAt ? (
                     <p className="text-xs text-gray-500 mt-1">
                       Last synced: <FormattedDate date={curStatus.lastSyncedAt} />
                     </p>
-                  )}
-                  {curStatus.lastBatch && (
+                  ) : null}
+
+                  {curStatus.lastBatch ? (
                     <p className="text-xs text-gray-500">
-                      Last batch: {curStatus.lastBatch.batchId} ({curStatus.lastBatch.status}) -{' '}
+                      Last batch: {curStatus.lastBatch.batchId} ({curStatus.lastBatch.status}) —{' '}
                       {curStatus.lastBatch.eventsUpserted} events
                     </p>
-                  )}
-                  {curStatus.lastError && (
-                    <p className="text-xs text-red-600 mt-1">Error: {curStatus.lastError}</p>
-                  )}
+                  ) : null}
+
+                  {curStatus.lastError ? <p className="text-xs text-red-600 mt-1">Error: {curStatus.lastError}</p> : null}
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
 
-          {/* Summary */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-lg shadow p-4">
               <p className="text-sm text-gray-500">Total Accounts</p>
               <p className="text-2xl font-bold text-gray-900">{allAccounts.length}</p>
             </div>
+
             <div className="bg-white rounded-lg shadow p-4">
               <p className="text-sm text-gray-500">Active</p>
-              <p className="text-2xl font-bold text-green-600">
-                {allAccounts.filter((a) => a.status === 'active').length}
-              </p>
+              <p className="text-2xl font-bold text-green-600">{allAccounts.filter((a) => a.status === 'active').length}</p>
             </div>
+
             <div className="bg-white rounded-lg shadow p-4">
               <p className="text-sm text-gray-500">Pending</p>
-              <p className="text-2xl font-bold text-yellow-600">
-                {allAccounts.filter((a) => a.status === 'pending').length}
-              </p>
+              <p className="text-2xl font-bold text-yellow-600">{allAccounts.filter((a) => a.status === 'pending').length}</p>
             </div>
+
             <div className="bg-white rounded-lg shadow p-4">
               <p className="text-sm text-gray-500">Organizations</p>
               <p className="text-2xl font-bold text-gray-900">{Object.keys(accountsByOrg).length}</p>
             </div>
           </div>
 
-          {/* Accounts grouped by organization */}
           {Object.keys(accountsByOrg).length === 0 ? (
             <div className="bg-white rounded-lg shadow p-12 text-center">
               <p className="text-gray-500 mb-4">No cloud accounts found.</p>
@@ -201,14 +190,12 @@ export default async function AccountsPage() {
                   <div className="px-6 py-4 border-b border-gray-200">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-gray-900">{org.name}</h3>
-                      <Link
-                        href={`/organizations/${org.id}/cloud-accounts`}
-                        className="text-sm text-blue-600 hover:text-blue-700"
-                      >
+                      <Link href={`/organizations/${org.id}/cloud-accounts`} className="text-sm text-blue-600 hover:text-blue-700">
                         Manage →
                       </Link>
                     </div>
                   </div>
+
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
@@ -230,55 +217,47 @@ export default async function AccountsPage() {
                           </th>
                         </tr>
                       </thead>
+
                       <tbody className="bg-white divide-y divide-gray-200">
                         {accounts.map((account) => (
                           <tr key={account.id} className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm font-medium text-gray-900">{account.accountName}</div>
-                              {account.accountIdentifier && (
-                                <div className="text-xs text-gray-500">{account.accountIdentifier}</div>
-                              )}
+                              {account.accountIdentifier ? <div className="text-xs text-gray-500">{account.accountIdentifier}</div> : null}
                             </td>
+
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">{account.provider}</div>
-                              {account.connectionType && (
-                                <div className="text-xs text-gray-500">{account.connectionType}</div>
-                              )}
+                              {account.connectionType ? <div className="text-xs text-gray-500">{account.connectionType}</div> : null}
                             </td>
+
                             <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(account.status)}</td>
+
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {account.lastSyncedAt ? (
                                 <FormattedDate
                                   date={account.lastSyncedAt}
                                   locale="en-US"
-                                  options={{
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  }}
+                                  options={{ year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }}
                                 />
                               ) : (
                                 'Never'
                               )}
                             </td>
+
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                              {account.provider === 'AWS' &&
-                                account.connectionType === 'COST_EXPLORER' &&
-                                account.status === 'active' && (
-                                  <SyncNowButton accountId={account.id} orgId={org.id} />
-                                )}
+                              {account.provider === 'AWS' && account.connectionType === 'COST_EXPLORER' && account.status === 'active' ? (
+                                <SyncNowButton accountId={account.id} orgId={org.id} />
+                              ) : null}
+
                               <Link
                                 href={`/organizations/${org.id}/cloud-accounts/${account.id}/records`}
                                 className="text-blue-600 hover:text-blue-700"
                               >
                                 View Records
                               </Link>
-                              <Link
-                                href={`/organizations/${org.id}/cloud-accounts`}
-                                className="text-gray-600 hover:text-gray-900"
-                              >
+
+                              <Link href={`/organizations/${org.id}/cloud-accounts`} className="text-gray-600 hover:text-gray-900">
                                 Manage
                               </Link>
                             </td>
