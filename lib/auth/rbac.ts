@@ -196,3 +196,15 @@ export async function canCreateAlerts(orgId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Check if user can manage directory (Teams, Projects, Apps, Clients)
+ */
+export async function canManageDirectory(orgId: string): Promise<boolean> {
+  try {
+    const role = await getUserRole(orgId)
+    return role === 'admin' || role === 'finance' || role === 'manager'
+  } catch (error) {
+    return false
+  }
+}
+

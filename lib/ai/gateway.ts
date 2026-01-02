@@ -353,7 +353,7 @@ export async function processAiRequest(
       },
     })
 
-    // Create CostEvent
+    // Create CostEvent with direct dimension columns
     const dimensions: CostEventDimensions = {}
     if (input.userId) dimensions.userId = input.userId
     if (input.teamId) dimensions.teamId = input.teamId
@@ -383,6 +383,11 @@ export async function processAiRequest(
         unit: 'TOKENS',
         costCategory: 'AI',
         dimensions: Object.keys(dimensions).length > 0 ? dimensions : undefined,
+        // Direct dimension columns for efficient querying
+        teamId: input.teamId || null,
+        projectId: input.projectId || null,
+        appId: input.appId || null,
+        clientId: input.clientId || null,
         rawRef: {
           requestId: apiResponse.requestId,
           inputTokens: apiResponse.inputTokens,

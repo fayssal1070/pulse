@@ -150,11 +150,43 @@ export async function checkTokenLimits(
 }
 
 /**
+ * Check requireAttribution policy
+ */
+export async function checkAttributionRequired(
+  orgId: string,
+  appId?: string
+): Promise<PolicyCheckResult> {
+  const policies = await prisma.aiPolicy.findMany({
+    where: {
+      orgId,
+      enabled: true,
+      requireAttribution: true,
+    },
+  })
+
+  if (policies.length > 0 && !appId) {
+    return {
+      allowed: false,
+      reason: 'appId required by policy. Please provide appId in request.',
+      policyId: policies[0].id,
+    }
+  }
+
+  return { allowed: true }
+}
+
+/**
  * Comprehensive policy check
  */
 export async function checkPolicies(
   context: RequestContext
 ): Promise<PolicyCheckResult> {
+  // Check attribution requirement
+  const attributionCheck = await checkAttributionRequired(context.orgId, context.appId)
+  if (!attributionCheck.allowed) {
+    return attributionCheck
+  }
+
   // Check model allow/block
   const modelCheck = await checkModelAllowed(context.orgId, context.model)
   if (!modelCheck.allowed) {

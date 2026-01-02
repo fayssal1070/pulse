@@ -54,6 +54,10 @@ model Organization {
   memberships             Membership[]
   orgIntegrations         OrgIntegration[]
   notificationPreferences NotificationPreference[]
+  teams                   Team[]
+  projects                Project[]
+  apps                    App[]
+  clients                 Client[]
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
@@ -66,12 +70,15 @@ model Membership {
   userId       String
   orgId        String
   role         String       @default("member")
+  teamId       String? // Team assignment
   createdAt    DateTime     @default(now())
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team         Team?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
   @@unique([userId, orgId])
   @@index([orgId])
+  @@index([teamId])
 }
 
 model CostRecord {
@@ -228,6 +235,11 @@ model CostEvent {
   unit             String? // "Hrs", "GB-Mo", "TOKENS", etc.
   costCategory     String? // "Compute", "Storage", "AI", "Network", etc.
   dimensions       Json? // { userId, teamId, projectId, appId, clientId, model, taskType }
+  // Direct dimension references for efficient querying
+  teamId           String?
+  projectId        String?
+  appId            String?
+  clientId         String?
   tags             Json? // AWS tags or custom tags
   rawRef           Json? // CUR line identifiers or AI requestId
   uniqueHash       String       @unique // SHA-256 hash for deduplication
@@ -235,6 +247,10 @@ model CostEvent {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   organization     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  team             Team?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  project          Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  app              App?         @relation(fields: [appId], references: [id], onDelete: SetNull)
+  client           Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
   @@unique([orgId, uniqueHash], map: "CostEvent_orgId_uniqueHash_key")
   @@index([orgId])
@@ -242,6 +258,10 @@ model CostEvent {
   @@index([orgId, source])
   @@index([orgId, source, occurredAt])
   @@index([orgId, provider])
+  @@index([orgId, teamId])
+  @@index([orgId, projectId])
+  @@index([orgId, appId])
+  @@index([orgId, clientId])
   @@index([ingestionBatchId])
 }
 
@@ -309,17 +329,18 @@ model AiGatewayKey {
 
 // AI Gateway Policies
 model AiPolicy {
-  id               String       @id @default(cuid())
-  orgId            String
-  name             String
-  allowedModels    Json? // Array of allowed model identifiers
-  blockedModels    Json? // Array of blocked model identifiers
-  maxCostPerDayEur Decimal?     @db.Decimal(12, 4)
-  maxTokensPerReq  Int?
-  enabled          Boolean      @default(true)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  organization     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  id                 String       @id @default(cuid())
+  orgId              String
+  name               String
+  allowedModels      Json? // Array of allowed model identifiers
+  blockedModels      Json? // Array of blocked model identifiers
+  maxCostPerDayEur   Decimal?     @db.Decimal(12, 4)
+  maxTokensPerReq    Int?
+  requireAttribution Boolean      @default(false) // If true, appId required
+  enabled            Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  organization       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([orgId])
   @@index([orgId, enabled])
@@ -346,12 +367,82 @@ model AiRequestLog {
   statusCode       Int?
   rawRef           Json? // Provider request ID and metadata
   organization     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  team             Team?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  project          Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  app              App?         @relation(fields: [appId], references: [id], onDelete: SetNull)
+  client           Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
   @@index([orgId])
   @@index([orgId, occurredAt])
   @@index([orgId, provider, model])
   @@index([orgId, userId])
+  @@index([orgId, teamId])
   @@index([orgId, projectId])
+  @@index([orgId, appId])
+  @@index([orgId, clientId])
+}
+
+// Directory models for dimension attribution
+model Team {
+  id            String         @id @default(cuid())
+  orgId         String
+  name          String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  organization  Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  memberships   Membership[]
+  costEvents    CostEvent[]
+  aiRequestLogs AiRequestLog[]
+
+  @@index([orgId])
+  @@index([orgId, name])
+}
+
+model Project {
+  id            String         @id @default(cuid())
+  orgId         String
+  name          String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  organization  Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  costEvents    CostEvent[]
+  aiRequestLogs AiRequestLog[]
+
+  @@index([orgId])
+  @@index([orgId, name])
+}
+
+model App {
+  id            String         @id @default(cuid())
+  orgId         String
+  name          String
+  slug          String // Unique per org for API/URL usage
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  organization  Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  costEvents    CostEvent[]
+  aiRequestLogs AiRequestLog[]
+
+  @@unique([orgId, slug])
+  @@index([orgId])
+  @@index([orgId, name])
+  @@index([orgId, slug])
+}
+
+model Client {
+  id            String         @id @default(cuid())
+  orgId         String
+  name          String
+  externalId    String? // External identifier (e.g., customer ID from another system)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  organization  Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  costEvents    CostEvent[]
+  aiRequestLogs AiRequestLog[]
+
+  @@index([orgId])
+  @@index([orgId, name])
+  @@index([orgId, externalId])
 }
 
 // User notification preferences (per org)

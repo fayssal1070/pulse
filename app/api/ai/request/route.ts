@@ -15,11 +15,78 @@ export async function POST(request: Request) {
     const body = await request.json()
 
     // Extract dimensions from headers (x-pulse-*) or body
-    const teamId = request.headers.get('x-pulse-team') || body.teamId
+    let teamId = request.headers.get('x-pulse-team') || body.teamId
     const projectId = request.headers.get('x-pulse-project') || body.projectId
     const appId = request.headers.get('x-pulse-app') || body.appId
     const clientId = request.headers.get('x-pulse-client') || body.clientId
     const tags = body.tags || []
+
+    // Derive teamId from membership if not provided
+    if (!teamId) {
+      const { prisma } = await import('@/lib/prisma')
+      const membership = await prisma.membership.findUnique({
+        where: {
+          userId_orgId: {
+            userId: user.id,
+            orgId: activeOrg.id,
+          },
+        },
+        select: { teamId: true },
+      })
+      if (membership?.teamId) {
+        teamId = membership.teamId
+      }
+    }
+
+    // Validate dimension IDs belong to org
+    const { prisma } = await import('@/lib/prisma')
+    if (projectId) {
+      const project = await prisma.project.findFirst({
+        where: { id: projectId, orgId: activeOrg.id },
+      })
+      if (!project) {
+        return NextResponse.json({ error: 'Invalid projectId' }, { status: 400 })
+      }
+    }
+    if (appId) {
+      const app = await prisma.app.findFirst({
+        where: { id: appId, orgId: activeOrg.id },
+      })
+      if (!app) {
+        return NextResponse.json({ error: 'Invalid appId' }, { status: 400 })
+      }
+    }
+    if (clientId) {
+      const client = await prisma.client.findFirst({
+        where: { id: clientId, orgId: activeOrg.id },
+      })
+      if (!client) {
+        return NextResponse.json({ error: 'Invalid clientId' }, { status: 400 })
+      }
+    }
+    if (teamId) {
+      const team = await prisma.team.findFirst({
+        where: { id: teamId, orgId: activeOrg.id },
+      })
+      if (!team) {
+        return NextResponse.json({ error: 'Invalid teamId' }, { status: 400 })
+      }
+    }
+
+    // Check requireAttribution policy
+    const policies = await prisma.aiPolicy.findMany({
+      where: {
+        orgId: activeOrg.id,
+        enabled: true,
+        requireAttribution: true,
+      },
+    })
+    if (policies.length > 0 && !appId) {
+      return NextResponse.json(
+        { error: 'appId required by policy. Please provide appId in request.' },
+        { status: 400 }
+      )
+    }
 
     // Validate required fields
     if (!body.model) {

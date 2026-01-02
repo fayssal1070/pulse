@@ -29,6 +29,7 @@ const navigation = [
   { name: 'Costs', href: '/costs', icon: '💰' },
   { name: 'AI Logs', href: '/logs/ai', icon: '🤖' },
   { name: 'Cloud Accounts', href: '/accounts', icon: '☁️' },
+  { name: 'Directory', href: '/directory', icon: '📁' },
   { name: 'Budgets', href: '/budgets', icon: '📋' },
   { name: 'Alerts', href: '/alerts', icon: '🔔' },
   { name: 'Notifications', href: '/notifications', icon: '🔔' },
