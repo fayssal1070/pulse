@@ -58,6 +58,7 @@ model Organization {
   projects                Project[]
   apps                    App[]
   clients                 Client[]
+  cronRuns                CronRun[]
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
@@ -495,4 +496,24 @@ model CronRunLog {
   @@index([ranAt])
   @@index([cronName, ranAt])
   @@index([status])
+}
+
+// CronRun model for production hardening (PR13)
+model CronRun {
+  id         String    @id @default(cuid())
+  orgId      String? // Nullable for org-agnostic crons
+  type       String // "RUN_ALERTS" | "APPLY_RETENTION" | "SYNC_AWS_CUR"
+  status     String // "SUCCESS" | "FAIL"
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  error      String? // Error message if status=FAIL
+  metaJson   String? // JSON metadata (stored as text)
+
+  organization Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+
+  @@index([type])
+  @@index([status])
+  @@index([startedAt])
+  @@index([type, startedAt])
+  @@index([orgId])
 }

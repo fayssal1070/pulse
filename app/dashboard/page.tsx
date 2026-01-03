@@ -22,6 +22,7 @@ import ErrorBoundary from '@/components/error-boundary'
 import HydrationErrorDetector from '@/components/hydration-error-detector'
 import SetupChecklist from '@/components/setup/setup-checklist'
 import OnboardingWarning from '@/components/directory/onboarding-warning'
+import DiagnosticsCard from '@/components/dashboard/diagnostics-card'
 import Link from 'next/link'
 
 export default async function DashboardPage({
@@ -128,6 +129,13 @@ export default async function DashboardPage({
             <div className="mb-6">
               <Recommendations recommendations={recommendations} />
             </div>
+
+            {/* Diagnostics Card (Admin only) */}
+            {isAdminUser && (
+              <div className="mb-6">
+                <DiagnosticsCard />
+              </div>
+            )}
 
             {/* Quick Actions (smaller, at bottom) */}
             <div className="bg-white rounded-lg shadow p-4">

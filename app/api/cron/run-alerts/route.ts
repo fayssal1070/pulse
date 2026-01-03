@@ -31,6 +31,22 @@ export async function POST(request: Request) {
   const ranAt = new Date()
   const startTime = Date.now()
 
+  // Create CronRun log entry
+  let cronRunId: string | null = null
+  try {
+    const cronRun = await prisma.cronRun.create({
+      data: {
+        type: 'RUN_ALERTS',
+        status: 'FAIL', // Will update to SUCCESS on completion
+        startedAt: ranAt,
+      },
+    })
+    cronRunId = cronRun.id
+  } catch (error) {
+    // Never fail the cron response if logging fails
+    console.error('Failed to create CronRun log:', error)
+  }
+
   try {
     // Get all active organizations
     const organizations = await prisma.organization.findMany({
@@ -81,23 +97,55 @@ export async function POST(request: Request) {
 
     const status = allErrors.length === 0 ? 'OK' : 'ERROR'
     const durationMs = Date.now() - startTime
+    const finishedAt = new Date()
 
-    // Insert proof log (always, even if no alerts)
-    await prisma.cronRunLog.create({
-      data: {
-        cronName: 'run-alerts',
-        ranAt,
-        status,
-        orgsProcessed: organizations.length,
-        alertsTriggered: totalTriggered,
-        sentEmail: totalSentEmail,
-        sentTelegram: totalSentTelegram,
-        sentInApp: totalSentInApp,
-        durationMs,
-        errorCount: allErrors.length,
-        errorSample: allErrors.length > 0 ? allErrors[0].substring(0, 500) : null,
-      },
-    })
+    // Update CronRun log
+    if (cronRunId) {
+      try {
+        await prisma.cronRun.update({
+          where: { id: cronRunId },
+          data: {
+            status: allErrors.length === 0 ? 'SUCCESS' : 'FAIL',
+            finishedAt,
+            error: allErrors.length > 0 ? allErrors[0].substring(0, 1000) : null,
+            metaJson: JSON.stringify({
+              orgsProcessed: organizations.length,
+              triggered: totalTriggered,
+              sentEmail: totalSentEmail,
+              sentTelegram: totalSentTelegram,
+              sentInApp: totalSentInApp,
+              durationMs,
+              errorsCount: allErrors.length,
+            }),
+          },
+        })
+      } catch (error) {
+        // Never fail the cron response if logging fails
+        console.error('Failed to update CronRun log:', error)
+      }
+    }
+
+    // Insert proof log (always, even if no alerts) - keep existing CronRunLog for backward compatibility
+    try {
+      await prisma.cronRunLog.create({
+        data: {
+          cronName: 'run-alerts',
+          ranAt,
+          status,
+          orgsProcessed: organizations.length,
+          alertsTriggered: totalTriggered,
+          sentEmail: totalSentEmail,
+          sentTelegram: totalSentTelegram,
+          sentInApp: totalSentInApp,
+          durationMs,
+          errorCount: allErrors.length,
+          errorSample: allErrors.length > 0 ? allErrors[0].substring(0, 500) : null,
+        },
+      })
+    } catch (error) {
+      // Never fail the cron response if logging fails
+      console.error('Failed to create CronRunLog:', error)
+    }
 
     // Minimal server-side log (no secrets)
     console.log(`CRON_RUN_ALERTS_COMPLETED: ${organizations.length} orgs, ${totalTriggered} triggered, ${totalSentEmail} email, ${totalSentTelegram} telegram, ${totalSentInApp} in-app, ${allErrors.length} errors`)
@@ -114,22 +162,47 @@ export async function POST(request: Request) {
     })
   } catch (error: any) {
     const durationMs = Date.now() - startTime
-    // Insert proof log on error
-    await prisma.cronRunLog.create({
-      data: {
-        cronName: 'run-alerts',
-        ranAt,
-        status: 'ERROR',
-        orgsProcessed: 0,
-        alertsTriggered: 0,
-        sentEmail: 0,
-        sentTelegram: 0,
-        sentInApp: 0,
-        durationMs,
-        errorCount: 1,
-        errorSample: error.message?.substring(0, 500) || 'Unknown error',
-      },
-    }).catch(() => {}) // Ignore insert errors if DB fails
+    const finishedAt = new Date()
+
+    // Update CronRun log on error
+    if (cronRunId) {
+      try {
+        await prisma.cronRun.update({
+          where: { id: cronRunId },
+          data: {
+            status: 'FAIL',
+            finishedAt,
+            error: error.message?.substring(0, 1000) || 'Unknown error',
+            metaJson: JSON.stringify({ durationMs }),
+          },
+        })
+      } catch (logError) {
+        // Never fail the cron response if logging fails
+        console.error('Failed to update CronRun log on error:', logError)
+      }
+    }
+
+    // Insert proof log on error - keep existing CronRunLog for backward compatibility
+    try {
+      await prisma.cronRunLog.create({
+        data: {
+          cronName: 'run-alerts',
+          ranAt,
+          status: 'ERROR',
+          orgsProcessed: 0,
+          alertsTriggered: 0,
+          sentEmail: 0,
+          sentTelegram: 0,
+          sentInApp: 0,
+          durationMs,
+          errorCount: 1,
+          errorSample: error.message?.substring(0, 500) || 'Unknown error',
+        },
+      })
+    } catch (logError) {
+      // Ignore insert errors if DB fails
+      console.error('Failed to create CronRunLog on error:', logError)
+    }
 
     console.error('CRON_RUN_ALERTS_ERROR:', error.message)
     return NextResponse.json(
