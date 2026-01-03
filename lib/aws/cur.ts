@@ -151,21 +151,35 @@ function normalizeCurLineToCostEvent(
       }
     }
 
-    // Map common tags to dimensions
-    if (tags['Project'] || tags['project']) {
-      dimensions.projectId = tags['Project'] || tags['project']
+    // Map pulse:* tags to Directory entities (async mapping will be done in upsertCostEventsBatch)
+    // Store tag values for later mapping
+    const pulseAppTag = tags['pulse:app'] || tags['pulse:App']
+    const pulseProjectTag = tags['pulse:project'] || tags['pulse:Project']
+    const pulseClientTag = tags['pulse:client'] || tags['pulse:Client']
+    const pulseTeamTag = tags['pulse:team'] || tags['pulse:Team']
+
+    // Also support legacy tags (Project, Team, App, Client)
+    const legacyProjectTag = tags['Project'] || tags['project']
+    const legacyTeamTag = tags['Team'] || tags['team']
+    const legacyAppTag = tags['App'] || tags['app']
+    const legacyClientTag = tags['Client'] || tags['client']
+    const legacyUserTag = tags['User'] || tags['user']
+
+    // Store tag values in dimensions for mapping (will be resolved in upsertCostEventsBatch)
+    if (pulseAppTag || legacyAppTag) {
+      dimensions._appTag = pulseAppTag || legacyAppTag
     }
-    if (tags['Team'] || tags['team']) {
-      dimensions.teamId = tags['Team'] || tags['team']
+    if (pulseProjectTag || legacyProjectTag) {
+      dimensions._projectTag = pulseProjectTag || legacyProjectTag
     }
-    if (tags['User'] || tags['user']) {
-      dimensions.userId = tags['User'] || tags['user']
+    if (pulseClientTag || legacyClientTag) {
+      dimensions._clientTag = pulseClientTag || legacyClientTag
     }
-    if (tags['App'] || tags['app']) {
-      dimensions.appId = tags['App'] || tags['app']
+    if (pulseTeamTag || legacyTeamTag) {
+      dimensions._teamTag = pulseTeamTag || legacyTeamTag
     }
-    if (tags['Client'] || tags['client']) {
-      dimensions.clientId = tags['Client'] || tags['client']
+    if (legacyUserTag) {
+      dimensions.userId = legacyUserTag
     }
 
     // Determine cost category
@@ -509,6 +523,11 @@ export async function syncCurForOrg(orgId: string): Promise<CurIngestionResult> 
       }
     }
 
+    // Count events with appId (for attribution visibility)
+    // Note: appId filtering will work after Prisma client regeneration
+    // For now, we'll count via dimensions JSON
+    const eventsWithAppId = 0 // TODO: count via dimensions JSON or after Prisma regeneration
+
     // Update batch
     await prisma.ingestionBatch.update({
       where: { id: batch.id },
@@ -520,6 +539,10 @@ export async function syncCurForOrg(orgId: string): Promise<CurIngestionResult> 
         eventsUpserted: totalEventsUpserted,
         errorsCount: allErrors.length,
         sampleError: allErrors[0]?.substring(0, 500) || null,
+        metadata: {
+          eventsWithAppId,
+          attributionRate: totalEventsUpserted > 0 ? (eventsWithAppId / totalEventsUpserted) * 100 : 0,
+        },
       },
     })
 

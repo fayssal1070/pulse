@@ -4,6 +4,7 @@ import { requireActiveOrgOrRedirect } from '@/lib/organizations/require-active-o
 import { isAdmin } from '@/lib/admin-helpers'
 import AppShell from '@/components/app-shell'
 import CostsPageClient from '@/components/costs/costs-page-client'
+import OnboardingWarning from '@/components/directory/onboarding-warning'
 
 export default async function CostsPage() {
   const user = await requireAuth()
@@ -21,6 +22,7 @@ export default async function CostsPage() {
     >
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
+          <OnboardingWarning />
           <CostsPageClient />
         </div>
       </div>

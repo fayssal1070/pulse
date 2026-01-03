@@ -42,6 +42,11 @@ export async function GET(request: NextRequest) {
         ...e,
         occurredAt: e.occurredAt.toISOString(),
         rawRef: e.rawRef,
+        // Include dimension names
+        teamName: e.teamName || null,
+        projectName: e.projectName || null,
+        appName: e.appName || null,
+        clientName: e.clientName || null,
       })),
       pagination: {
         page,

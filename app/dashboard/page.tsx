@@ -21,6 +21,7 @@ import UIDebugPanel from '@/components/ui-debug-panel'
 import ErrorBoundary from '@/components/error-boundary'
 import HydrationErrorDetector from '@/components/hydration-error-detector'
 import SetupChecklist from '@/components/setup/setup-checklist'
+import OnboardingWarning from '@/components/directory/onboarding-warning'
 import Link from 'next/link'
 
 export default async function DashboardPage({
@@ -99,6 +100,9 @@ export default async function DashboardPage({
 
             {/* Setup Checklist */}
             <SetupChecklist />
+
+            {/* Directory Onboarding Warning */}
+            <OnboardingWarning />
 
             {/* KPIs */}
             <KPICards kpis={kpis} />

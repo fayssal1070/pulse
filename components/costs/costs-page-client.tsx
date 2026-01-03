@@ -35,6 +35,17 @@ interface CostEventRow {
   clientId: string | null
   service: string | null
   rawRef?: any
+  // Dimension names (from API)
+  teamName?: string | null
+  projectName?: string | null
+  appName?: string | null
+  clientName?: string | null
+}
+
+interface DirectoryEntity {
+  id: string
+  name: string
+  slug?: string
 }
 
 interface EventsResponse {
@@ -83,6 +94,13 @@ export default function CostsPageClient() {
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
 
+  // Directory entities for dropdowns
+  const [teams, setTeams] = useState<DirectoryEntity[]>([])
+  const [projects, setProjects] = useState<DirectoryEntity[]>([])
+  const [apps, setApps] = useState<DirectoryEntity[]>([])
+  const [clients, setClients] = useState<DirectoryEntity[]>([])
+  const [loadingDirectory, setLoadingDirectory] = useState(true)
+
   // Build query params
   const buildQueryParams = useCallback(() => {
     const params = new URLSearchParams()
@@ -101,6 +119,39 @@ export default function CostsPageClient() {
     params.set('pageSize', pageSize.toString())
     return params
   }, [dateRange, customStartDate, customEndDate, provider, dimension, search, userId, teamId, projectId, appId, clientId, page, pageSize])
+
+  // Fetch directory entities
+  const fetchDirectory = useCallback(async () => {
+    try {
+      const [teamsRes, projectsRes, appsRes, clientsRes] = await Promise.all([
+        fetch('/api/directory/teams'),
+        fetch('/api/directory/projects'),
+        fetch('/api/directory/apps'),
+        fetch('/api/directory/clients'),
+      ])
+
+      if (teamsRes.ok) {
+        const data = await teamsRes.json()
+        setTeams(data.teams || [])
+      }
+      if (projectsRes.ok) {
+        const data = await projectsRes.json()
+        setProjects(data.projects || [])
+      }
+      if (appsRes.ok) {
+        const data = await appsRes.json()
+        setApps(data.apps || [])
+      }
+      if (clientsRes.ok) {
+        const data = await clientsRes.json()
+        setClients(data.clients || [])
+      }
+    } catch (error) {
+      console.error('Error fetching directory:', error)
+    } finally {
+      setLoadingDirectory(false)
+    }
+  }, [])
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -136,6 +187,11 @@ export default function CostsPageClient() {
       setLoading(false)
     }
   }, [buildQueryParams])
+
+  // Load directory on mount
+  useEffect(() => {
+    fetchDirectory()
+  }, [fetchDirectory])
 
   // Initialize dimension filters from URL (handles drilldown)
   useEffect(() => {
@@ -280,6 +336,93 @@ export default function CostsPageClient() {
               placeholder="Search by model, provider, service..."
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
             />
+          </div>
+        </div>
+
+        {/* Directory Filters */}
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Team Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Team</label>
+            <select
+              value={teamId}
+              onChange={(e) => {
+                setTeamId(e.target.value)
+                setPage(1)
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              data-testid="directory-filter-team"
+            >
+              <option value="">All Teams</option>
+              {teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Project Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+            <select
+              value={projectId}
+              onChange={(e) => {
+                setProjectId(e.target.value)
+                setPage(1)
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              data-testid="directory-filter-project"
+            >
+              <option value="">All Projects</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* App Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">App</label>
+            <select
+              value={appId}
+              onChange={(e) => {
+                setAppId(e.target.value)
+                setPage(1)
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              data-testid="directory-filter-app"
+            >
+              <option value="">All Apps</option>
+              {apps.map((app) => (
+                <option key={app.id} value={app.id}>
+                  {app.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Client Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+            <select
+              value={clientId}
+              onChange={(e) => {
+                setClientId(e.target.value)
+                setPage(1)
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              data-testid="directory-filter-client"
+            >
+              <option value="">All Clients</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -439,10 +582,10 @@ export default function CostsPageClient() {
                             {event.amountEur.toFixed(4)} €
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{event.userId || '-'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{event.teamId || '-'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{event.projectId || '-'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{event.appId || '-'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{event.clientId || '-'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{event.teamName || '-'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{event.projectName || '-'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{event.appName || '-'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{event.clientName || '-'}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{event.source}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono text-xs">
                             {event.source === 'AI' && event.rawRef?.requestId ? (

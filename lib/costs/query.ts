@@ -52,6 +52,11 @@ export interface CostEventRow {
   clientId: string | null
   service: string | null
   rawRef?: any
+  // Dimension names
+  teamName?: string | null
+  projectName?: string | null
+  appName?: string | null
+  clientName?: string | null
 }
 
 /**
@@ -342,7 +347,7 @@ export async function getCostEvents(
 ): Promise<{ events: CostEventRow[]; totalCount: number }> {
   const { where, startDate, endDate } = buildWhereClause(filters, userIdForRBAC)
 
-  // Fetch all events (we need to filter in memory for dimensions)
+  // Fetch all events with dimension relations
   let events = await prisma.costEvent.findMany({
     where,
     select: {
@@ -354,6 +359,22 @@ export async function getCostEvents(
       amountEur: true,
       dimensions: true,
       rawRef: true,
+      teamId: true,
+      projectId: true,
+      appId: true,
+      clientId: true,
+      team: {
+        select: { name: true },
+      },
+      project: {
+        select: { name: true },
+      },
+      app: {
+        select: { name: true },
+      },
+      client: {
+        select: { name: true },
+      },
     },
   })
 
@@ -365,7 +386,7 @@ export async function getCostEvents(
     })
   }
 
-  // Filter by dimension filters
+  // Filter by dimension filters (use dimensions JSON for now, will use direct columns after Prisma regeneration)
   if (filters.userId) {
     events = events.filter((e) => {
       const dims = (e.dimensions as any) || {}
@@ -375,25 +396,25 @@ export async function getCostEvents(
   if (filters.teamId) {
     events = events.filter((e) => {
       const dims = (e.dimensions as any) || {}
-      return dims.teamId === filters.teamId
+      return dims.teamId === filters.teamId || (e as any).teamId === filters.teamId
     })
   }
   if (filters.projectId) {
     events = events.filter((e) => {
       const dims = (e.dimensions as any) || {}
-      return dims.projectId === filters.projectId
+      return dims.projectId === filters.projectId || (e as any).projectId === filters.projectId
     })
   }
   if (filters.appId) {
     events = events.filter((e) => {
       const dims = (e.dimensions as any) || {}
-      return dims.appId === filters.appId
+      return dims.appId === filters.appId || (e as any).appId === filters.appId
     })
   }
   if (filters.clientId) {
     events = events.filter((e) => {
       const dims = (e.dimensions as any) || {}
-      return dims.clientId === filters.clientId
+      return dims.clientId === filters.clientId || (e as any).clientId === filters.clientId
     })
   }
 
@@ -435,9 +456,59 @@ export async function getCostEvents(
   const skip = (page - 1) * pageSize
   const paginatedEvents = events.slice(skip, skip + pageSize)
 
-  // Map to CostEventRow
+  // Map to CostEventRow with dimension names
+  // Fetch dimension names separately (will use relations after Prisma regeneration)
+  const dimsMap = new Map<string, { teamId?: string; projectId?: string; appId?: string; clientId?: string }>()
+  for (const e of paginatedEvents) {
+    const dims = (e.dimensions as any) || {}
+    dimsMap.set(e.id, {
+      teamId: (e as any).teamId || dims.teamId,
+      projectId: (e as any).projectId || dims.projectId,
+      appId: (e as any).appId || dims.appId,
+      clientId: (e as any).clientId || dims.clientId,
+    })
+  }
+
+  const allTeamIds = [...new Set(Array.from(dimsMap.values()).map((d) => d.teamId).filter(Boolean) as string[])]
+  const allProjectIds = [...new Set(Array.from(dimsMap.values()).map((d) => d.projectId).filter(Boolean) as string[])]
+  const allAppIds = [...new Set(Array.from(dimsMap.values()).map((d) => d.appId).filter(Boolean) as string[])]
+  const allClientIds = [...new Set(Array.from(dimsMap.values()).map((d) => d.clientId).filter(Boolean) as string[])]
+
+  const [teams, projects, apps, clients] = await Promise.all([
+    allTeamIds.length > 0
+      ? prisma.team.findMany({
+          where: { id: { in: allTeamIds }, orgId: filters.orgId },
+          select: { id: true, name: true },
+        })
+      : [],
+    allProjectIds.length > 0
+      ? prisma.project.findMany({
+          where: { id: { in: allProjectIds }, orgId: filters.orgId },
+          select: { id: true, name: true },
+        })
+      : [],
+    allAppIds.length > 0
+      ? prisma.app.findMany({
+          where: { id: { in: allAppIds }, orgId: filters.orgId },
+          select: { id: true, name: true },
+        })
+      : [],
+    allClientIds.length > 0
+      ? prisma.client.findMany({
+          where: { id: { in: allClientIds }, orgId: filters.orgId },
+          select: { id: true, name: true },
+        })
+      : [],
+  ])
+
+  const teamMap = new Map(teams.map((t) => [t.id, t.name]))
+  const projectMap = new Map(projects.map((p) => [p.id, p.name]))
+  const appMap = new Map(apps.map((a) => [a.id, a.name]))
+  const clientMap = new Map(clients.map((c) => [c.id, c.name]))
+
   const rows: CostEventRow[] = paginatedEvents.map((e) => {
     const dims = (e.dimensions as any) || {}
+    const dimIds = dimsMap.get(e.id) || {}
     return {
       id: e.id,
       occurredAt: e.occurredAt,
@@ -446,12 +517,16 @@ export async function getCostEvents(
       model: dims.model || null,
       amountEur: Number(e.amountEur),
       userId: dims.userId || null,
-      teamId: dims.teamId || null,
-      projectId: dims.projectId || null,
-      appId: dims.appId || null,
-      clientId: dims.clientId || null,
+      teamId: dimIds.teamId || null,
+      projectId: dimIds.projectId || null,
+      appId: dimIds.appId || null,
+      clientId: dimIds.clientId || null,
       service: e.service,
       rawRef: e.rawRef as any,
+      teamName: dimIds.teamId ? teamMap.get(dimIds.teamId) || null : null,
+      projectName: dimIds.projectId ? projectMap.get(dimIds.projectId) || null : null,
+      appName: dimIds.appId ? appMap.get(dimIds.appId) || null : null,
+      clientName: dimIds.clientId ? clientMap.get(dimIds.clientId) || null : null,
     }
   })
 
@@ -541,6 +616,56 @@ export async function exportCostEventsCsv(
     })
   }
 
+  // Fetch dimension names for CSV
+  const teamIds = [...new Set(events.map((e) => {
+    const dims = (e.dimensions as any) || {}
+    return (e as any).teamId || dims.teamId
+  }).filter(Boolean) as string[])]
+  const projectIds = [...new Set(events.map((e) => {
+    const dims = (e.dimensions as any) || {}
+    return (e as any).projectId || dims.projectId
+  }).filter(Boolean) as string[])]
+  const appIds = [...new Set(events.map((e) => {
+    const dims = (e.dimensions as any) || {}
+    return (e as any).appId || dims.appId
+  }).filter(Boolean) as string[])]
+  const clientIds = [...new Set(events.map((e) => {
+    const dims = (e.dimensions as any) || {}
+    return (e as any).clientId || dims.clientId
+  }).filter(Boolean) as string[])]
+
+  const [teams, projects, apps, clients] = await Promise.all([
+    teamIds.length > 0
+      ? prisma.team.findMany({
+          where: { id: { in: teamIds }, orgId: filters.orgId },
+          select: { id: true, name: true },
+        })
+      : [],
+    projectIds.length > 0
+      ? prisma.project.findMany({
+          where: { id: { in: projectIds }, orgId: filters.orgId },
+          select: { id: true, name: true },
+        })
+      : [],
+    appIds.length > 0
+      ? prisma.app.findMany({
+          where: { id: { in: appIds }, orgId: filters.orgId },
+          select: { id: true, name: true },
+        })
+      : [],
+    clientIds.length > 0
+      ? prisma.client.findMany({
+          where: { id: { in: clientIds }, orgId: filters.orgId },
+          select: { id: true, name: true },
+        })
+      : [],
+  ])
+
+  const teamMap = new Map(teams.map((t) => [t.id, t.name]))
+  const projectMap = new Map(projects.map((p) => [p.id, p.name]))
+  const appMap = new Map(apps.map((a) => [a.id, a.name]))
+  const clientMap = new Map(clients.map((c) => [c.id, c.name]))
+
   // Generate CSV
   const headers = [
     'Date',
@@ -552,15 +677,19 @@ export async function exportCostEventsCsv(
     'Amount (USD)',
     'Currency',
     'User ID',
-    'Team ID',
-    'Project ID',
-    'App ID',
-    'Client ID',
+    'Team',
+    'Project',
+    'App',
+    'Client',
     'Event ID',
   ]
 
   const rows = events.map((e) => {
     const dims = (e.dimensions as any) || {}
+    const teamId = (e as any).teamId || dims.teamId
+    const projectId = (e as any).projectId || dims.projectId
+    const appId = (e as any).appId || dims.appId
+    const clientId = (e as any).clientId || dims.clientId
     return [
       e.occurredAt.toISOString(),
       e.source,
@@ -571,10 +700,10 @@ export async function exportCostEventsCsv(
       e.amountUsd ? Number(e.amountUsd).toFixed(4) : '',
       e.currency,
       dims.userId || '',
-      dims.teamId || '',
-      dims.projectId || '',
-      dims.appId || '',
-      dims.clientId || '',
+      (teamId && teamMap.get(teamId)) || '',
+      (projectId && projectMap.get(projectId)) || '',
+      (appId && appMap.get(appId)) || '',
+      (clientId && clientMap.get(clientId)) || '',
       e.id,
     ]
   })
