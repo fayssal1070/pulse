@@ -78,12 +78,13 @@ export async function POST(request: Request) {
       where: {
         orgId: activeOrg.id,
         enabled: true,
-        requireAttribution: true,
+        // requireAttribution will be available after Prisma regeneration
       },
     })
-    if (policies.length > 0 && !appId) {
+    const hasRequireAttribution = policies.some((p: any) => p.enabled && p.requireAttribution)
+    if (hasRequireAttribution && !appId) {
       return NextResponse.json(
-        { error: 'appId required by policy. Please provide appId in request.' },
+        { error: 'appId required by policy. Create an App in /directory then pass x-pulse-app header or appId in request body.' },
         { status: 400 }
       )
     }

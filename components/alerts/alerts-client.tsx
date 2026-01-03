@@ -445,7 +445,14 @@ export default function AlertsClient() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                             {event.amountEUR > 0 ? `€${event.amountEUR.toFixed(2)}` : '-'}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">{event.message}</td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {event.message}
+                            {event.metadata?.targetName && (
+                              <span className="ml-2 text-xs text-gray-400">
+                                ({event.metadata.scopeType || 'ORG'}: {event.metadata.targetName})
+                              </span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

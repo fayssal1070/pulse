@@ -103,19 +103,41 @@ export async function computeBudgetStatus(
                 : null
 
       if (dimensionKey) {
-        // Fetch events and filter by dimension
-        const events = await prisma.costEvent.findMany({
-          where,
-          select: {
-            amountEur: true,
-            dimensions: true,
-          },
-        })
+        // Use direct columns if available (after Prisma regeneration), otherwise fallback to dimensions JSON
+        const whereWithScope: any = { ...where }
+        
+        // Try direct column first (will work after Prisma regeneration)
+        if (dimensionKey === 'teamId') {
+          whereWithScope.teamId = budget.scopeId
+        } else if (dimensionKey === 'projectId') {
+          whereWithScope.projectId = budget.scopeId
+        } else if (dimensionKey === 'appId') {
+          whereWithScope.appId = budget.scopeId
+        } else if (dimensionKey === 'clientId') {
+          whereWithScope.clientId = budget.scopeId
+        }
 
-        for (const event of events) {
-          const dims = event.dimensions as any
-          if (dims?.[dimensionKey] === budget.scopeId) {
-            currentSpend += Number(event.amountEur)
+        try {
+          const result = await prisma.costEvent.aggregate({
+            where: whereWithScope,
+            _sum: { amountEur: true },
+          })
+          currentSpend = Number(result._sum.amountEur || 0)
+        } catch (error) {
+          // Fallback to dimensions JSON if direct columns not available
+          const events = await prisma.costEvent.findMany({
+            where,
+            select: {
+              amountEur: true,
+              dimensions: true,
+            },
+          })
+
+          for (const event of events) {
+            const dims = event.dimensions as any
+            if (dims?.[dimensionKey] === budget.scopeId) {
+              currentSpend += Number(event.amountEur)
+            }
           }
         }
       }
@@ -132,12 +154,42 @@ export async function computeBudgetStatus(
       status = 'WARNING'
     }
 
+    // Fetch scope name from Directory
+    let scopeName = 'Organization'
+    if (budget.scopeId) {
+      if (budget.scopeType === 'APP') {
+        const app = await (prisma as any).app.findFirst({
+          where: { id: budget.scopeId, orgId },
+          select: { name: true },
+        })
+        scopeName = app?.name || budget.scopeId
+      } else if (budget.scopeType === 'PROJECT') {
+        const project = await (prisma as any).project.findFirst({
+          where: { id: budget.scopeId, orgId },
+          select: { name: true },
+        })
+        scopeName = project?.name || budget.scopeId
+      } else if (budget.scopeType === 'CLIENT') {
+        const client = await (prisma as any).client.findFirst({
+          where: { id: budget.scopeId, orgId },
+          select: { name: true },
+        })
+        scopeName = client?.name || budget.scopeId
+      } else if (budget.scopeType === 'TEAM') {
+        const team = await (prisma as any).team.findFirst({
+          where: { id: budget.scopeId, orgId },
+          select: { name: true },
+        })
+        scopeName = team?.name || budget.scopeId
+      }
+    }
+
     return {
       budgetId: budget.id,
       budgetName: budget.name,
       scopeType: budget.scopeType,
       scopeId: budget.scopeId,
-      scopeName: budget.scopeId || 'Organization',
+      scopeName,
       period: budget.period as 'MONTHLY' | 'DAILY',
       currentSpend,
       limit,

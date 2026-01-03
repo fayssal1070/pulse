@@ -160,15 +160,16 @@ export async function checkAttributionRequired(
     where: {
       orgId,
       enabled: true,
-      requireAttribution: true,
+      // requireAttribution will be available after Prisma regeneration
     },
   })
+  const hasRequireAttribution = policies.some((p: any) => p.enabled && p.requireAttribution)
 
-  if (policies.length > 0 && !appId) {
+  if (hasRequireAttribution && !appId) {
     return {
       allowed: false,
-      reason: 'appId required by policy. Please provide appId in request.',
-      policyId: policies[0].id,
+      reason: 'appId required by policy. Create an App in /directory then pass x-pulse-app header or appId in request body.',
+      policyId: policies[0]?.id,
     }
   }
 

@@ -27,6 +27,7 @@ export interface DailyTrendPoint {
 export interface BudgetAlert {
   id: string
   budgetId: string
+  budgetName?: string
   scopeType: string
   scopeId: string | null
   scopeName: string
@@ -227,20 +228,14 @@ export async function getTopConsumers(
  */
 export async function getActiveBudgetAlerts(orgId: string): Promise<BudgetAlert[]> {
   try {
-    const monthStart = new Date()
-    monthStart.setDate(1)
-    monthStart.setHours(0, 0, 0, 0)
-    
-    // Get all budgets for org
+    // Get all enabled budgets for org
     const budgets = await prisma.budget.findMany({
-      where: { orgId },
+      where: { 
+        orgId,
+        enabled: true,
+      },
       select: {
         id: true,
-        scopeType: true,
-        scopeId: true,
-        period: true,
-        amountEur: true,
-        alertThresholdPct: true,
       },
     })
 
@@ -250,80 +245,27 @@ export async function getActiveBudgetAlerts(orgId: string): Promise<BudgetAlert[
 
     const alerts: BudgetAlert[] = []
 
+    // Use computeBudgetStatus which already handles scopeName lookup
+    const { computeBudgetStatus } = await import('@/lib/alerts/engine')
+
     for (const budget of budgets) {
-      // Calculate current spend for this budget scope
-      let currentSpend = 0
-      
-      const where: any = {
-        orgId,
-        occurredAt: { gte: monthStart },
-      }
+      const status = await computeBudgetStatus(orgId, budget.id)
+      if (!status) continue
 
-      // Filter by scope if applicable
-      if (budget.scopeType !== 'ORG' && budget.scopeId) {
-        const dimensionKey = 
-          budget.scopeType === 'TEAM' ? 'teamId' :
-          budget.scopeType === 'PROJECT' ? 'projectId' :
-          budget.scopeType === 'APP' ? 'appId' :
-          budget.scopeType === 'CLIENT' ? 'clientId' : null
-
-        if (dimensionKey) {
-          // Fetch events and filter by dimension
-          const events = await prisma.costEvent.findMany({
-            where,
-            select: {
-              amountEur: true,
-              dimensions: true,
-            },
-          })
-
-          for (const event of events) {
-            const dims = event.dimensions as any
-            if (dims?.[dimensionKey] === budget.scopeId) {
-              currentSpend += Number(event.amountEur)
-            }
-          }
-        } else {
-          // For ORG scope, sum all events
-          const result = await prisma.costEvent.aggregate({
-            where,
-            _sum: { amountEur: true },
-          })
-          currentSpend = Number(result._sum.amountEur || 0)
-        }
-      } else {
-        // ORG scope
-        const result = await prisma.costEvent.aggregate({
-          where,
-          _sum: { amountEur: true },
-        })
-        currentSpend = Number(result._sum.amountEur || 0)
-      }
-
-      const limit = Number(budget.amountEur)
-      const percentage = limit > 0 ? (currentSpend / limit) * 100 : 0
-      const threshold = budget.alertThresholdPct || 80
-      
-      let status: 'OK' | 'WARNING' | 'EXCEEDED' = 'OK'
-      if (percentage >= 100) {
-        status = 'EXCEEDED'
-      } else if (percentage >= threshold) {
-        status = 'WARNING'
-      }
-
-      // Only include if WARNING or EXCEEDED
-      if (status !== 'OK') {
+      // Only include if WARNING or CRITICAL
+      if (status.status === 'WARNING' || status.status === 'CRITICAL') {
         alerts.push({
           id: budget.id,
           budgetId: budget.id,
-          scopeType: budget.scopeType,
-          scopeId: budget.scopeId,
-          scopeName: budget.scopeId || 'Organization',
-          currentSpend,
-          limit,
-          percentage,
-          status,
-          period: budget.period as 'MONTHLY' | 'DAILY',
+          budgetName: status.budgetName,
+          scopeType: status.scopeType,
+          scopeId: status.scopeId,
+          scopeName: status.scopeName,
+          currentSpend: status.currentSpend,
+          limit: status.limit,
+          percentage: status.percentage,
+          status: status.status === 'CRITICAL' ? 'EXCEEDED' : 'WARNING',
+          period: status.period,
         })
       }
     }

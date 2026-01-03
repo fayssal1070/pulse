@@ -246,6 +246,50 @@ function CreateBudgetForm({
     hardLimit: false,
   })
   const [submitting, setSubmitting] = useState(false)
+  
+  // Directory entities for dropdowns
+  const [teams, setTeams] = useState<Array<{ id: string; name: string }>>([])
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([])
+  const [apps, setApps] = useState<Array<{ id: string; name: string }>>([])
+  const [clients, setClients] = useState<Array<{ id: string; name: string }>>([])
+  const [loadingDirectory, setLoadingDirectory] = useState(false)
+
+  useEffect(() => {
+    async function fetchDirectory() {
+      setLoadingDirectory(true)
+      try {
+        const [teamsRes, projectsRes, appsRes, clientsRes] = await Promise.all([
+          fetch('/api/directory/teams'),
+          fetch('/api/directory/projects'),
+          fetch('/api/directory/apps'),
+          fetch('/api/directory/clients'),
+        ])
+
+        if (teamsRes.ok) {
+          const data = await teamsRes.json()
+          setTeams(data.teams || [])
+        }
+        if (projectsRes.ok) {
+          const data = await projectsRes.json()
+          setProjects(data.projects || [])
+        }
+        if (appsRes.ok) {
+          const data = await appsRes.json()
+          setApps(data.apps || [])
+        }
+        if (clientsRes.ok) {
+          const data = await clientsRes.json()
+          setClients(data.clients || [])
+        }
+      } catch (error) {
+        console.error('Error fetching directory:', error)
+      } finally {
+        setLoadingDirectory(false)
+      }
+    }
+
+    fetchDirectory()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -295,8 +339,9 @@ function CreateBudgetForm({
             <label className="block text-sm font-medium text-gray-700">Scope Type</label>
             <select
               value={formData.scopeType}
-              onChange={(e) => setFormData({ ...formData, scopeType: e.target.value as any })}
+              onChange={(e) => setFormData({ ...formData, scopeType: e.target.value as any, scopeId: '' })}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              data-testid="budget-scope"
             >
               <option value="ORG">Organization</option>
               <option value="TEAM">Team</option>
@@ -307,15 +352,73 @@ function CreateBudgetForm({
           </div>
           {formData.scopeType !== 'ORG' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700">Scope ID</label>
-              <input
-                type="text"
-                required
-                value={formData.scopeId}
-                onChange={(e) => setFormData({ ...formData, scopeId: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                placeholder="team-123 or project-456"
-              />
+              <label className="block text-sm font-medium text-gray-700">
+                {formData.scopeType === 'APP' ? 'App' : formData.scopeType === 'PROJECT' ? 'Project' : formData.scopeType === 'CLIENT' ? 'Client' : 'Team'}
+              </label>
+              {formData.scopeType === 'APP' && (
+                <select
+                  required
+                  value={formData.scopeId}
+                  onChange={(e) => setFormData({ ...formData, scopeId: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  data-testid="budget-select-app"
+                >
+                  <option value="">Select App</option>
+                  {apps.map((app) => (
+                    <option key={app.id} value={app.id}>
+                      {app.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {formData.scopeType === 'PROJECT' && (
+                <select
+                  required
+                  value={formData.scopeId}
+                  onChange={(e) => setFormData({ ...formData, scopeId: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  data-testid="budget-select-project"
+                >
+                  <option value="">Select Project</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {formData.scopeType === 'CLIENT' && (
+                <select
+                  required
+                  value={formData.scopeId}
+                  onChange={(e) => setFormData({ ...formData, scopeId: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  data-testid="budget-select-client"
+                >
+                  <option value="">Select Client</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {formData.scopeType === 'TEAM' && (
+                <select
+                  required
+                  value={formData.scopeId}
+                  onChange={(e) => setFormData({ ...formData, scopeId: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  data-testid="budget-select-team"
+                >
+                  <option value="">Select Team</option>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
         </div>

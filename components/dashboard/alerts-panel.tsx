@@ -102,7 +102,10 @@ export default function AlertsPanel({ initialAlerts = [] }: AlertsPanelProps) {
                     </span>
                   </div>
                   <p className="text-sm text-gray-700 mt-1">
-                    <span className="font-medium">{alert.scopeName}</span>
+                    <span className="font-medium">{alert.scopeType}: {alert.scopeName || '(Unknown)'}</span>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Budget: {alert.budgetName || alert.budgetId}
                   </p>
                   <div className="mt-2 flex items-center space-x-4 text-sm">
                     <span className="text-gray-600">

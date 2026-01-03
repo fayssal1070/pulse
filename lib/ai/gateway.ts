@@ -34,6 +34,8 @@ export interface AiRequestResponse {
   estimatedCostEur?: number
   requestId?: string
   error?: string
+  blockedBy?: string
+  budgetId?: string
 }
 
 /**
@@ -45,13 +47,16 @@ function hashPrompt(prompt: string): string {
 
 /**
  * Check budget enforcement for AI requests
+ * Priority: APP -> PROJECT -> CLIENT -> TEAM -> ORG (most specific first)
  */
 async function checkBudgetEnforcement(
   orgId: string,
   teamId?: string,
   projectId?: string,
+  appId?: string,
+  clientId?: string,
   estimatedCost: number = 0
-): Promise<{ allowed: boolean; reason?: string; budgetId?: string }> {
+): Promise<{ allowed: boolean; reason?: string; budgetId?: string; scopeType?: string }> {
   try {
     // Get all enabled budgets with hardLimit=true
     const budgets = await prisma.budget.findMany({
@@ -70,51 +75,61 @@ async function checkBudgetEnforcement(
       },
     })
 
-    for (const budget of budgets) {
-      // Check if this budget applies to this request
-      let applies = false
+    // Check budgets in priority order: APP -> PROJECT -> CLIENT -> TEAM -> ORG
+    const priorityOrder = [
+      { type: 'APP' as const, id: appId },
+      { type: 'PROJECT' as const, id: projectId },
+      { type: 'CLIENT' as const, id: clientId },
+      { type: 'TEAM' as const, id: teamId },
+      { type: 'ORG' as const, id: null },
+    ]
 
-      if (budget.scopeType === 'ORG') {
-        applies = true
-      } else if (budget.scopeType === 'TEAM' && budget.scopeId === teamId) {
-        applies = true
-      } else if (budget.scopeType === 'PROJECT' && budget.scopeId === projectId) {
-        applies = true
-      }
+    for (const priority of priorityOrder) {
+      if (priority.type === 'ORG' || priority.id) {
+        // Find matching budget for this scope
+        const budget = budgets.find((b) => {
+          if (b.scopeType === 'ORG') {
+            return priority.type === 'ORG'
+          }
+          return b.scopeType === priority.type && b.scopeId === priority.id
+        })
 
-      if (!applies) continue
+        if (!budget) continue
 
-      // Compute budget status
-      const status = await computeBudgetStatus(orgId, budget.id)
-      if (!status) continue
+        // Compute budget status
+        const budgetStatus = await computeBudgetStatus(orgId, budget.id)
+        if (!budgetStatus) continue
 
-      // If critical and action is block, deny request
-      if (status.status === 'CRITICAL') {
-        const actions = budget.actions as any
-        if (actions?.block === true) {
+        // Type guard for status
+        const statusValue = budgetStatus.status
+
+        // If critical and hardLimit=true, deny request
+        if (statusValue === 'CRITICAL') {
           return {
             allowed: false,
-            reason: `Budget "${budget.name}" exceeded (${status.percentage.toFixed(1)}%). Request blocked.`,
+            reason: `Budget "${budget.name}" exceeded (${budgetStatus.percentage.toFixed(1)}%). Request blocked.`,
             budgetId: budget.id,
+            scopeType: budget.scopeType,
           }
         }
-      }
 
-      // If warning and projected cost would exceed, check restrict action
-      if (status.status === 'WARNING' || status.status === 'CRITICAL') {
-        const projectedSpend = status.currentSpend + estimatedCost
-        const projectedPercentage = (projectedSpend / status.limit) * 100
+        // If warning and projected cost would exceed with hardLimit, block
+        if (statusValue === 'WARNING') {
+          const projectedSpend = budgetStatus.currentSpend + estimatedCost
+          const projectedPercentage = (projectedSpend / budgetStatus.limit) * 100
 
-        if (projectedPercentage >= 100) {
-          const actions = budget.actions as any
-          if (actions?.block === true) {
+          if (projectedPercentage >= 100) {
             return {
               allowed: false,
               reason: `Budget "${budget.name}" would be exceeded (${projectedPercentage.toFixed(1)}%). Request blocked.`,
               budgetId: budget.id,
+              scopeType: budget.scopeType,
             }
           }
         }
+
+        // If we found a matching budget, stop checking (most specific wins)
+        break
       }
     }
 
@@ -235,9 +250,16 @@ export async function processAiRequest(
     }
 
     // Check budget enforcement BEFORE policies
-    const budgetCheck = await checkBudgetEnforcement(input.orgId, input.teamId, input.projectId, estimatedCost)
+    const budgetCheck = await checkBudgetEnforcement(
+      input.orgId,
+      input.teamId,
+      input.projectId,
+      input.appId,
+      input.clientId,
+      estimatedCost
+    )
     if (!budgetCheck.allowed) {
-      // Log blocked request
+      // Log blocked request with scope info
       await prisma.aiRequestLog.create({
         data: {
           orgId: input.orgId,
@@ -256,8 +278,10 @@ export async function processAiRequest(
           latencyMs: Date.now() - startTime,
           statusCode: 403,
           rawRef: {
-            reason: 'budget_blocked',
+            reason: budgetCheck.scopeType ? `budget_blocked_${budgetCheck.scopeType.toLowerCase()}` : 'budget_blocked',
             budgetId: budgetCheck.budgetId,
+            scopeType: budgetCheck.scopeType,
+            blocked: true,
           },
         },
       })
@@ -265,8 +289,12 @@ export async function processAiRequest(
       return {
         success: false,
         error: budgetCheck.reason || 'Budget exceeded. Request blocked.',
+        // Include scope info in error response
+        blockedBy: budgetCheck.scopeType ? `budget_blocked_${budgetCheck.scopeType.toLowerCase()}` : 'budget_blocked',
+        budgetId: budgetCheck.budgetId,
       }
     }
+
 
     const policyCheck = await checkPolicies(policyContext)
     if (!policyCheck.allowed) {
