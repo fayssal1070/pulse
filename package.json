@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "check-alerts": "node scripts/check-alerts-with-telegram.js",
     "seed": "node prisma/seed.js",
+    "migrate:deploy": "prisma migrate deploy",
     "postinstall": "prisma generate"
   },
   "prisma": {
