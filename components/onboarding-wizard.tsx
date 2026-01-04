@@ -2,9 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import OnboardingStep1 from './onboarding-step1'
-import OnboardingStep2 from './onboarding-step2'
-import OnboardingStep3 from './onboarding-step3'
+import OnboardingStepDirectory from './onboarding/onboarding-step-directory'
+import OnboardingStepBudgets from './onboarding/onboarding-step-budgets'
+import OnboardingStepAlertRules from './onboarding/onboarding-step-alert-rules'
+import OnboardingStepNotifications from './onboarding/onboarding-step-notifications'
+import OnboardingStepAIProviders from './onboarding/onboarding-step-ai-providers'
 
 interface OnboardingWizardProps {
   currentStep: number
@@ -13,6 +15,8 @@ interface OnboardingWizardProps {
   step1Completed: boolean
   step2Completed: boolean
   step3Completed: boolean
+  step4Completed: boolean
+  step5Completed: boolean
 }
 
 export default function OnboardingWizard({
@@ -22,6 +26,8 @@ export default function OnboardingWizard({
   step1Completed,
   step2Completed,
   step3Completed,
+  step4Completed,
+  step5Completed,
 }: OnboardingWizardProps) {
   const router = useRouter()
   const [step, setStep] = useState(currentStep)
@@ -38,8 +44,14 @@ export default function OnboardingWizard({
     }
   }
 
-  const handleStepComplete = (nextStep: number) => {
+  const handleStepComplete = () => {
+    const nextStep = step + 1
     setStep(nextStep)
+    router.refresh()
+  }
+
+  const handleFinalComplete = () => {
+    router.push('/admin/e2e')
     router.refresh()
   }
 
@@ -59,7 +71,7 @@ export default function OnboardingWizard({
           
           {/* Progress indicator */}
           <div className="flex items-center space-x-2">
-            {[1, 2, 3].map((s) => (
+            {[1, 2, 3, 4, 5].map((s) => (
               <div key={s} className="flex-1 flex items-center">
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
@@ -72,7 +84,7 @@ export default function OnboardingWizard({
                 >
                   {s < step ? '✓' : s}
                 </div>
-                {s < 3 && (
+                {s < 5 && (
                   <div
                     className={`flex-1 h-1 mx-2 ${
                       s < step ? 'bg-green-500' : 'bg-gray-200'
@@ -86,24 +98,33 @@ export default function OnboardingWizard({
 
         {/* Step content */}
         {step === 1 && (
-          <OnboardingStep1
-            organizations={organizations}
-            onComplete={() => handleStepComplete(2)}
+          <OnboardingStepDirectory
+            organizationId={organizationId}
+            onComplete={handleStepComplete}
           />
         )}
         {step === 2 && (
-          <OnboardingStep2
+          <OnboardingStepBudgets
             organizationId={organizationId}
-            onComplete={() => handleStepComplete(3)}
+            onComplete={handleStepComplete}
           />
         )}
         {step === 3 && (
-          <OnboardingStep3
+          <OnboardingStepAlertRules
             organizationId={organizationId}
-            onComplete={() => {
-              router.push('/dashboard')
-              router.refresh()
-            }}
+            onComplete={handleStepComplete}
+          />
+        )}
+        {step === 4 && (
+          <OnboardingStepNotifications
+            organizationId={organizationId}
+            onComplete={handleStepComplete}
+          />
+        )}
+        {step === 5 && (
+          <OnboardingStepAIProviders
+            organizationId={organizationId}
+            onComplete={handleFinalComplete}
           />
         )}
       </div>

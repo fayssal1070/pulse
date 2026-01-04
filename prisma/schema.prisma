@@ -59,6 +59,8 @@ model Organization {
   apps                    App[]
   clients                 Client[]
   cronRuns                CronRun[]
+  aiProviderConnections   AiProviderConnection[]
+  aiModelRoutes           AiModelRoute[]
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
@@ -475,6 +477,57 @@ model OrgIntegration {
   organization          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([orgId])
+}
+
+// AI Provider Connections (OpenAI, Anthropic, xAI, Google, Mistral)
+enum AiProvider {
+  OPENAI
+  ANTHROPIC
+  XAI
+  GOOGLE
+  MISTRAL
+}
+
+enum AiProviderConnectionStatus {
+  ACTIVE
+  DISABLED
+}
+
+model AiProviderConnection {
+  id               String                      @id @default(cuid())
+  orgId            String
+  provider         AiProvider
+  name             String
+  status           AiProviderConnectionStatus  @default(ACTIVE)
+  encryptedApiKey  String // TEXT - encrypted API key
+  keyLast4         String // Last 4 chars for display
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  organization     Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, provider, name])
+  @@index([orgId])
+  @@index([orgId, provider])
+  @@index([orgId, status])
+}
+
+// AI Model Routes (which provider/model to use)
+model AiModelRoute {
+  id                String      @id @default(cuid())
+  orgId             String
+  provider          AiProvider
+  model             String // Model identifier (e.g., "gpt-4", "claude-3-opus")
+  enabled           Boolean             @default(true)
+  priority          Int                 @default(100) // Lower = higher priority
+  maxCostPerReqEUR  Float? // Optional max cost per request
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  organization      Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, provider, model])
+  @@index([orgId])
+  @@index([orgId, provider])
+  @@index([orgId, enabled])
 }
 
 // Cron run logs for monitoring (proof of execution)

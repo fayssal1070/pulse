@@ -142,10 +142,11 @@ async function checkBudgetEnforcement(
 }
 
 /**
- * Make request to OpenAI-compatible API
- * Supports simulation mode for development (PULSE_SIMULATE_AI=true)
+ * Route AI request through provider router
+ * Falls back to OPENAI_API_KEY env var if no provider configured (backward compatibility)
  */
-async function callOpenAI(
+async function routeProviderRequest(
+  orgId: string,
   model: string,
   messages: Array<{ role: string; content: string }>,
   maxTokens?: number,
@@ -156,6 +157,7 @@ async function callOpenAI(
   outputTokens: number
   totalTokens: number
   requestId: string
+  provider: string
 }> {
   // Simulation mode (dev only)
   const simulate = process.env.PULSE_SIMULATE_AI === 'true'
@@ -168,41 +170,73 @@ async function callOpenAI(
       outputTokens,
       totalTokens: inputTokens + outputTokens,
       requestId: `sim_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+      provider: 'simulated',
     }
   }
 
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY environment variable is not configured. Please set it in Vercel environment variables.')
-  }
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
+  try {
+    // Try to use router (if providers are configured)
+    const { routeAiRequest } = await import('./providers/router')
+    const result = await routeAiRequest({
+      orgId,
       model,
       messages,
-      max_tokens: maxTokens,
-      temperature: temperature ?? 0.7,
-    }),
-  })
+      maxTokens,
+      temperature,
+    })
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
-    throw new Error(error.error?.message || `OpenAI API error: ${response.statusText}`)
-  }
+    return {
+      content: result.text,
+      inputTokens: result.tokensIn,
+      outputTokens: result.tokensOut,
+      totalTokens: result.tokensIn + result.tokensOut,
+      requestId: result.raw?.id || `req_${Date.now()}`,
+      provider: result.provider,
+    }
+  } catch (routerError: any) {
+    // If router fails with "No provider connected", fall back to OPENAI_API_KEY for backward compatibility
+    if (routerError.message?.includes('No provider connected')) {
+      // Fallback to legacy OPENAI_API_KEY (backward compatibility)
+      const apiKey = process.env.OPENAI_API_KEY
+      if (!apiKey) {
+        throw new Error(
+          `No provider connected for model ${model}. Go to /admin/integrations/ai to configure providers.`
+        )
+      }
 
-  const data = await response.json()
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          max_tokens: maxTokens,
+          temperature: temperature ?? 0.7,
+        }),
+      })
 
-  return {
-    content: data.choices[0]?.message?.content || '',
-    inputTokens: data.usage?.prompt_tokens || 0,
-    outputTokens: data.usage?.completion_tokens || 0,
-    totalTokens: data.usage?.total_tokens || 0,
-    requestId: data.id || '',
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(error.error?.message || `OpenAI API error: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+
+      return {
+        content: data.choices[0]?.message?.content || '',
+        inputTokens: data.usage?.prompt_tokens || 0,
+        outputTokens: data.usage?.completion_tokens || 0,
+        totalTokens: data.usage?.total_tokens || 0,
+        requestId: data.id || '',
+        provider: 'openai',
+      }
+    }
+
+    // Re-throw other router errors
+    throw routerError
   }
 }
 
@@ -326,28 +360,17 @@ export async function processAiRequest(
       }
     }
 
-    // Make actual API call
-    const provider = getProviderFromModel(input.model)
-    let apiResponse: {
-      content: string
-      inputTokens: number
-      outputTokens: number
-      totalTokens: number
-      requestId: string
-    }
+    // Make actual API call through router
+    const apiResponse = await routeProviderRequest(
+      input.orgId,
+      input.model,
+      messages,
+      input.maxTokens,
+      input.temperature
+    )
 
-    if (provider === 'openai') {
-      apiResponse = await callOpenAI(
-        input.model,
-        messages,
-        input.maxTokens,
-        input.temperature
-      )
-    } else {
-      // For other providers, we'd implement similar functions
-      // For MVP, we'll support OpenAI only
-      throw new Error(`Provider ${provider} not yet supported`)
-    }
+    // Get provider from response (router returns the actual provider used)
+    const provider = apiResponse.provider || getProviderFromModel(input.model)
 
     const latencyMs = Date.now() - startTime
     const finalCost = estimateCost(
@@ -470,9 +493,12 @@ export async function processAiRequest(
     })
 
     // Return user-friendly error (never expose API keys)
-    const userError = errorMessage.includes('OPENAI_API_KEY')
-      ? 'AI Gateway is not configured. Please contact your administrator.'
-      : sanitizedError
+    let userError = sanitizedError
+    if (errorMessage.includes('No provider connected') || errorMessage.includes('OPENAI_API_KEY')) {
+      userError = errorMessage.includes('No provider connected')
+        ? sanitizedError // Router already provides clear message
+        : 'AI Gateway is not configured. Please contact your administrator.'
+    }
 
     return {
       success: false,

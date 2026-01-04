@@ -22,6 +22,7 @@ interface AppShellProps {
   commitSha?: string
   env?: string
   isAdmin?: boolean
+  needsOnboarding?: boolean
 }
 
 const navigation = [
@@ -37,7 +38,7 @@ const navigation = [
   { name: 'Settings', href: '/settings/notifications', icon: '⚙️' },
 ]
 
-export default function AppShell({ children, organizations, activeOrgId, hasActiveAWS = false, commitSha, env, isAdmin = false }: AppShellProps) {
+export default function AppShell({ children, organizations, activeOrgId, hasActiveAWS = false, commitSha, env, isAdmin = false, needsOnboarding = false }: AppShellProps) {
   const uiDebugEnabled = process.env.NEXT_PUBLIC_UI_DEBUG === 'true'
   const showBuildInfo = isAdmin && uiDebugEnabled
   const pathname = usePathname()
@@ -126,6 +127,20 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
                   {item.name}
                 </Link>
               ))}
+              {needsOnboarding && (
+                <Link
+                  href="/onboarding"
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                    isActive('/onboarding')
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-yellow-600 hover:bg-yellow-50'
+                  }`}
+                >
+                  <span className="mr-3">🚀</span>
+                  Onboarding
+                </Link>
+              )}
               {billingHref && (
                 <Link
                   href={billingHref}
@@ -181,6 +196,30 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
                     <span className="mr-3">🔗</span>
                     Integrations
                   </Link>
+                  <Link
+                    href="/admin/integrations/ai"
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                      isActive('/admin/integrations/ai')
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="mr-3">🤖</span>
+                    AI Providers
+                  </Link>
+                  <Link
+                    href="/admin/e2e"
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                      isActive('/admin/e2e')
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="mr-3">✅</span>
+                    E2E Validation
+                  </Link>
                 </>
               )}
             </nav>
@@ -221,6 +260,19 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
                   {item.name}
                 </Link>
               ))}
+              {needsOnboarding && (
+                <Link
+                  href="/onboarding"
+                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                    isActive('/onboarding')
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-yellow-600 hover:bg-yellow-50'
+                  }`}
+                >
+                  <span className="mr-3">🚀</span>
+                  Onboarding
+                </Link>
+              )}
               {billingHref && (
                 <Link
                   href={billingHref}
@@ -271,6 +323,28 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
                   >
                     <span className="mr-3">🔗</span>
                     Integrations
+                  </Link>
+                  <Link
+                    href="/admin/integrations/ai"
+                    className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                      isActive('/admin/integrations/ai')
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="mr-3">🤖</span>
+                    AI Providers
+                  </Link>
+                  <Link
+                    href="/admin/e2e"
+                    className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                      isActive('/admin/e2e')
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="mr-3">✅</span>
+                    E2E Validation
                   </Link>
                 </>
               )}
