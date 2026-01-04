@@ -104,17 +104,21 @@ DO $$ BEGIN
 END $$;
 
 -- Migration 5: 20250131000000_add_ai_providers_router
--- Créer les enums si nécessaire
+-- Créer les enums si nécessaire (vérifier avec le bon nom de type - PostgreSQL convertit en minuscules)
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'aiprovider') THEN
         CREATE TYPE "AiProvider" AS ENUM ('OPENAI', 'ANTHROPIC', 'XAI', 'GOOGLE', 'MISTRAL');
     END IF;
+EXCEPTION
+    WHEN duplicate_object THEN NULL; -- Si le type existe déjà, ignorer l'erreur
 END $$;
 
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'aiproviderconnectionstatus') THEN
         CREATE TYPE "AiProviderConnectionStatus" AS ENUM ('ACTIVE', 'DISABLED');
     END IF;
+EXCEPTION
+    WHEN duplicate_object THEN NULL; -- Si le type existe déjà, ignorer l'erreur
 END $$;
 
 -- Créer AiProviderConnection
