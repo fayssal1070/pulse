@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/auth-helpers'
+import { auth } from '@/auth'
 import { getActiveOrganization } from '@/lib/active-org'
 import { processAiRequest, type AiRequestInput } from '@/lib/ai/gateway'
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuth()
-    const activeOrg = await getActiveOrganization(user.id)
+    // Check authentication directly (don't use requireAuth as it redirects)
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const user = session.user
 
+    const activeOrg = await getActiveOrganization(user.id)
     if (!activeOrg) {
       return NextResponse.json({ error: 'No active organization' }, { status: 400 })
     }
@@ -78,7 +83,6 @@ export async function POST(request: NextRequest) {
       where: {
         orgId: activeOrg.id,
         enabled: true,
-        // requireAttribution will be available after Prisma regeneration
       },
     })
     const hasRequireAttribution = policies.some((p: any) => p.enabled && p.requireAttribution)
@@ -154,7 +158,11 @@ export async function POST(request: NextRequest) {
       ? 'AI Gateway is not configured. Please contact your administrator.'
       : sanitizedError
     
+    // Don't return 404 - return proper error codes
+    if (errorMessage.includes('Unauthorized') || errorMessage.includes('not authenticated')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
     return NextResponse.json({ error: userError }, { status: 500 })
   }
 }
-
