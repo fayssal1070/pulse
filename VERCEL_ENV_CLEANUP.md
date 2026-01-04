@@ -69,3 +69,4 @@ Après suppression de `NODE_TLS_REJECT_UNAUTHORIZED` :
 - Les appels Telegram (si configurés) doivent fonctionner avec TLS sécurisé
 
 
+

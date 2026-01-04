@@ -151,3 +151,4 @@ Navigate to `/admin/debug` (admin only) to see:
 - `/admin/debug` - Admin debug page to verify connection
 
 
+

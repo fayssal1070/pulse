@@ -315,19 +315,29 @@ model Budget {
 
 // AI Gateway API Keys
 model AiGatewayKey {
-  id              String       @id @default(cuid())
-  orgId           String
-  keyHash         String       @unique // SHA-256 hash of the API key
-  keyPrefix       String // First 8 chars for display
-  status          String       @default("active") // "active" | "revoked"
-  createdByUserId String
-  createdAt       DateTime     @default(now())
-  revokedAt       DateTime?
-  organization    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  id               String              @id @default(cuid())
+  orgId            String
+  keyHash          String              @unique // SHA-256 hash of the API key
+  keyPrefix        String // First 8 chars for display
+  status           String              @default("active") // "active" | "revoked"
+  createdByUserId  String
+  enabled          Boolean             @default(true)
+  defaultAppId     String? // Optional default app for attribution
+  defaultProjectId String? // Optional default project for attribution
+  defaultClientId  String? // Optional default client for attribution
+  rateLimitRpm     Int? // Rate limit per minute (null = unlimited)
+  createdAt        DateTime            @default(now())
+  revokedAt        DateTime?
+  organization     Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  defaultApp       App?                @relation(fields: [defaultAppId], references: [id], onDelete: SetNull)
+  defaultProject   Project?            @relation(fields: [defaultProjectId], references: [id], onDelete: SetNull)
+  defaultClient    Client?             @relation(fields: [defaultClientId], references: [id], onDelete: SetNull)
+  usageWindows     ApiKeyUsageWindow[]
 
   @@index([orgId])
   @@index([keyHash])
   @@index([orgId, status])
+  @@index([enabled])
 }
 
 // AI Gateway Policies
@@ -410,6 +420,7 @@ model Project {
   organization  Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   costEvents    CostEvent[]
   aiRequestLogs AiRequestLog[]
+  aiGatewayKeys AiGatewayKey[] // Keys with this as defaultProject
 
   @@index([orgId])
   @@index([orgId, name])
@@ -425,6 +436,7 @@ model App {
   organization  Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   costEvents    CostEvent[]
   aiRequestLogs AiRequestLog[]
+  aiGatewayKeys AiGatewayKey[] // Keys with this as defaultApp
 
   @@unique([orgId, slug])
   @@index([orgId])
@@ -442,6 +454,7 @@ model Client {
   organization  Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
   costEvents    CostEvent[]
   aiRequestLogs AiRequestLog[]
+  aiGatewayKeys AiGatewayKey[] // Keys with this as defaultClient
 
   @@index([orgId])
   @@index([orgId, name])
@@ -494,16 +507,16 @@ enum AiProviderConnectionStatus {
 }
 
 model AiProviderConnection {
-  id               String                      @id @default(cuid())
-  orgId            String
-  provider         AiProvider
-  name             String
-  status           AiProviderConnectionStatus  @default(ACTIVE)
-  encryptedApiKey  String // TEXT - encrypted API key
-  keyLast4         String // Last 4 chars for display
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  organization     Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  id              String                     @id @default(cuid())
+  orgId           String
+  provider        AiProvider
+  name            String
+  status          AiProviderConnectionStatus @default(ACTIVE)
+  encryptedApiKey String // TEXT - encrypted API key
+  keyLast4        String // Last 4 chars for display
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  organization    Organization               @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@unique([orgId, provider, name])
   @@index([orgId])
@@ -513,16 +526,16 @@ model AiProviderConnection {
 
 // AI Model Routes (which provider/model to use)
 model AiModelRoute {
-  id                String      @id @default(cuid())
-  orgId             String
-  provider          AiProvider
-  model             String // Model identifier (e.g., "gpt-4", "claude-3-opus")
-  enabled           Boolean             @default(true)
-  priority          Int                 @default(100) // Lower = higher priority
-  maxCostPerReqEUR  Float? // Optional max cost per request
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  organization      Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  id               String       @id @default(cuid())
+  orgId            String
+  provider         AiProvider
+  model            String // Model identifier (e.g., "gpt-4", "claude-3-opus")
+  enabled          Boolean      @default(true)
+  priority         Int          @default(100) // Lower = higher priority
+  maxCostPerReqEUR Float? // Optional max cost per request
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  organization     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@unique([orgId, provider, model])
   @@index([orgId])
@@ -569,4 +582,17 @@ model CronRun {
   @@index([startedAt])
   @@index([type, startedAt])
   @@index([orgId])
+}
+
+// API Key usage windows for rate limiting (60s windows)
+model ApiKeyUsageWindow {
+  id           String       @id @default(cuid())
+  keyId        String
+  windowStart  DateTime // Start of 60s window (truncated to minute)
+  count        Int          @default(0) // Request count in this window
+  aiGatewayKey AiGatewayKey @relation(fields: [keyId], references: [id], onDelete: Cascade)
+
+  @@unique([keyId, windowStart])
+  @@index([keyId])
+  @@index([windowStart])
 }

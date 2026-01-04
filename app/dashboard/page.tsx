@@ -22,6 +22,7 @@ import ErrorBoundary from '@/components/error-boundary'
 import HydrationErrorDetector from '@/components/hydration-error-detector'
 import SetupChecklist from '@/components/setup/setup-checklist'
 import OnboardingWarning from '@/components/directory/onboarding-warning'
+import OnboardingBanner from '@/components/onboarding/onboarding-banner'
 import DiagnosticsCard from '@/components/dashboard/diagnostics-card'
 import Link from 'next/link'
 
@@ -37,13 +38,9 @@ export default async function DashboardPage({
   const activeOrg = await requireActiveOrgOrRedirect(user.id, { nextPath: '/dashboard' })
   const isAdminUser = await isAdmin()
 
-  // Redirect to onboarding if onboarding not completed
+  // Check onboarding status (show banner if incomplete, don't redirect)
   const activeOrgId = activeOrg.id
-  let onboardingStatus = await getOnboardingStatus(activeOrgId)
-  if (!onboardingStatus.completed) {
-    const { redirect } = await import('next/navigation')
-    redirect('/onboarding')
-  }
+  const onboardingStatus = await getOnboardingStatus(activeOrgId)
 
   // Fetch executive dashboard data
   const [kpis, dailyTrend, topUsers, topTeams, topProjects, topApps, topClients, recommendations] = await Promise.all([
@@ -67,6 +64,7 @@ export default async function DashboardPage({
         commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
         env={process.env.VERCEL_ENV}
         isAdmin={isAdminUser}
+        needsOnboarding={!onboardingStatus.completed}
       >
         <UIDebugPanel
           commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
@@ -98,6 +96,9 @@ export default async function DashboardPage({
                 {activeOrg ? `Cost overview for ${activeOrg.name}` : 'Cost overview'}
               </p>
             </div>
+
+            {/* Onboarding Banner */}
+            {!onboardingStatus.completed && <OnboardingBanner />}
 
             {/* Setup Checklist */}
             <SetupChecklist />

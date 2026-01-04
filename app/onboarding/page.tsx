@@ -31,6 +31,8 @@ export default async function OnboardingPage() {
         step1Completed={status.step1Completed || false}
         step2Completed={status.step2Completed || false}
         step3Completed={status.step3Completed || false}
+        step4Completed={status.step4Completed || false}
+        step5Completed={status.step5Completed || false}
       />
     </div>
   )

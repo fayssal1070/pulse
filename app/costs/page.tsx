@@ -2,15 +2,18 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { getUserOrganizations } from '@/lib/organizations'
 import { requireActiveOrgOrRedirect } from '@/lib/organizations/require-active-org'
 import { isAdmin } from '@/lib/admin-helpers'
+import { getOnboardingStatus } from '@/lib/onboarding'
 import AppShell from '@/components/app-shell'
 import CostsPageClient from '@/components/costs/costs-page-client'
 import OnboardingWarning from '@/components/directory/onboarding-warning'
+import OnboardingBanner from '@/components/onboarding/onboarding-banner'
 
 export default async function CostsPage() {
   const user = await requireAuth()
   const organizations = await getUserOrganizations(user.id)
   const activeOrg = await requireActiveOrgOrRedirect(user.id, { nextPath: '/costs' })
   const isAdminUser = await isAdmin()
+  const onboardingStatus = await getOnboardingStatus(activeOrg.id)
 
   return (
     <AppShell
@@ -19,9 +22,11 @@ export default async function CostsPage() {
       commitSha={process.env.VERCEL_GIT_COMMIT_SHA}
       env={process.env.VERCEL_ENV}
       isAdmin={isAdminUser}
+      needsOnboarding={!onboardingStatus.completed}
     >
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
+          {!onboardingStatus.completed && <OnboardingBanner />}
           <OnboardingWarning />
           <CostsPageClient />
         </div>
