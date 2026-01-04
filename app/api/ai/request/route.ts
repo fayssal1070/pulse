@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-helpers'
 import { getActiveOrganization } from '@/lib/active-org'
 import { processAiRequest, type AiRequestInput } from '@/lib/ai/gateway'
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth()
     const activeOrg = await getActiveOrganization(user.id)
