@@ -3,6 +3,38 @@ import { auth } from '@/auth'
 import { getActiveOrganization } from '@/lib/active-org'
 import { processAiRequest, type AiRequestInput } from '@/lib/ai/gateway'
 
+/**
+ * GET /api/ai/request
+ * Health check endpoint
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const activeOrg = await getActiveOrganization(session.user.id)
+    if (!activeOrg) {
+      return NextResponse.json({ error: 'No active organization' }, { status: 400 })
+    }
+
+    return NextResponse.json({
+      ok: true,
+      message: 'AI Gateway is ready',
+      orgId: activeOrg.id,
+      endpoint: '/api/ai/request',
+      methods: ['POST'],
+    })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+  }
+}
+
+/**
+ * POST /api/ai/request
+ * Process AI request through gateway
+ */
 export async function POST(request: NextRequest) {
   try {
     // Check authentication directly (don't use requireAuth as it redirects)
