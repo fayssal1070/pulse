@@ -1,12 +1,26 @@
 -- CreateTable IF NOT EXISTS for AiProviderConnection (PR15 - AI Providers Router)
 -- Safe migration: uses IF NOT EXISTS to avoid errors if table already exists
 
+-- CreateEnum IF NOT EXISTS for AiProvider
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'AiProvider') THEN
+        CREATE TYPE "AiProvider" AS ENUM ('OPENAI', 'ANTHROPIC', 'XAI', 'GOOGLE', 'MISTRAL');
+    END IF;
+END $$;
+
+-- CreateEnum IF NOT EXISTS for AiProviderConnectionStatus
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'AiProviderConnectionStatus') THEN
+        CREATE TYPE "AiProviderConnectionStatus" AS ENUM ('ACTIVE', 'DISABLED');
+    END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS "AiProviderConnection" (
     "id" TEXT NOT NULL,
     "orgId" TEXT NOT NULL,
-    "provider" TEXT NOT NULL,
+    "provider" "AiProvider" NOT NULL,
     "name" TEXT NOT NULL,
-    "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+    "status" "AiProviderConnectionStatus" NOT NULL DEFAULT 'ACTIVE',
     "encryptedApiKey" TEXT NOT NULL,
     "keyLast4" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -19,7 +33,7 @@ CREATE TABLE IF NOT EXISTS "AiProviderConnection" (
 CREATE TABLE IF NOT EXISTS "AiModelRoute" (
     "id" TEXT NOT NULL,
     "orgId" TEXT NOT NULL,
-    "provider" TEXT NOT NULL,
+    "provider" "AiProvider" NOT NULL,
     "model" TEXT NOT NULL,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
     "priority" INTEGER NOT NULL DEFAULT 100,
