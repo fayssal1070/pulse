@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
+    "build:sdk": "cd packages/pulse-openai && npm install && npm run build",
     "start": "next start",
     "lint": "eslint",
     "check-alerts": "node scripts/check-alerts-with-telegram.js",

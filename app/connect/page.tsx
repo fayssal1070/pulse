@@ -24,7 +24,9 @@ export default async function ConnectPage() {
   }) > 0
 
   // Get base URL from environment or use default
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://pulse-sigma-eight.vercel.app/api/v1'
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.VERCEL_URL 
+    ? `https://${process.env.VERCEL_URL}/api/v1`
+    : 'https://pulse-sigma-eight.vercel.app/api/v1'
 
   return (
     <AppShell

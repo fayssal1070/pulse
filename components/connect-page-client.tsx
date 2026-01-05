@@ -1,7 +1,11 @@
 'use client'
 
+/**
+ * Connect Page Client Component
+ * User-friendly interface for connecting to Pulse AI Gateway
+ */
+
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 
 interface ConnectPageClientProps {
   organizationId: string
@@ -17,307 +21,228 @@ export default function ConnectPageClient({
   hasApiKeys,
 }: ConnectPageClientProps) {
   const [apiKey, setApiKey] = useState<string>('')
-  const [copiedUrl, setCopiedUrl] = useState(false)
-  const [copiedKey, setCopiedKey] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [copied, setCopied] = useState<string | null>(null)
 
+  // Fetch API keys on mount
   useEffect(() => {
-    // In a real implementation, you might fetch the API key from an endpoint
-    // For now, we'll show a placeholder
-    setApiKey('<YOUR_API_KEY>')
-  }, [])
+    if (hasApiKeys) {
+      loadApiKeys()
+    }
+  }, [hasApiKeys])
 
-  const copyToClipboard = (text: string, type: 'url' | 'key') => {
-    navigator.clipboard.writeText(text).then(() => {
-      if (type === 'url') {
-        setCopiedUrl(true)
-        setTimeout(() => setCopiedUrl(false), 2000)
-      } else {
-        setCopiedKey(true)
-        setTimeout(() => setCopiedKey(false), 2000)
+  const loadApiKeys = async () => {
+    try {
+      const res = await fetch('/api/admin/ai/keys')
+      const data = await res.json()
+      if (res.ok && data.keys && data.keys.length > 0) {
+        // Store first key (user will need to copy from /admin/ai for actual key)
+        setApiKey('YOUR_API_KEY_HERE')
       }
-    })
+    } catch (error) {
+      // Silent fail
+    }
   }
 
-  const baseUrlCode = baseUrl
-  const apiKeyCode = apiKey
+  const handleCopy = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(id)
+      setTimeout(() => setCopied(null), 2000)
+    } catch (error) {
+      // Fallback
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      setCopied(id)
+      setTimeout(() => setCopied(null), 2000)
+    }
+  }
+
+  const handleTestConnection = async () => {
+    if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
+      setTestResult({ success: false, message: 'Please enter a valid API key' })
+      return
+    }
+
+    setTesting(true)
+    setTestResult(null)
+
+    try {
+      const res = await fetch(`${baseUrl}/models`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        setTestResult({
+          success: true,
+          message: `Connection successful! Found ${data.data?.length || 0} models.`,
+        })
+      } else {
+        setTestResult({
+          success: false,
+          message: data.error?.message || `Connection failed: ${res.status} ${res.statusText}`,
+        })
+      }
+    } catch (error: any) {
+      setTestResult({
+        success: false,
+        message: error.message || 'Connection failed. Check your API key and network connection.',
+      })
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const baseUrlDisplay = baseUrl
+  const curlSnippet = `curl ${baseUrl}/chat/completions \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "gpt-4",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'`
 
   return (
     <div className="space-y-8">
       {/* Base URL Section */}
-      <section>
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4" data-testid="base-url-section">
-            Base URL
-          </h2>
-          <div className="flex items-center gap-3">
-            <code className="flex-1 bg-gray-100 px-4 py-2 rounded-md text-sm font-mono break-all">
-              {baseUrlCode}
-            </code>
-            <button
-              onClick={() => copyToClipboard(baseUrlCode, 'url')}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-md text-sm font-medium"
-              data-testid="copy-base-url-btn"
-            >
-              {copiedUrl ? 'Copied!' : 'Copy'}
-            </button>
-          </div>
-          <p className="mt-2 text-sm text-gray-600">
-            Use this as your <code className="bg-gray-100 px-1 py-0.5 rounded">baseURL</code> in OpenAI SDK, LangChain, or any OpenAI-compatible client
-          </p>
+      <div className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Base URL</h2>
+        <p className="text-gray-600 mb-4">Use this base URL for all API requests:</p>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 bg-gray-100 px-4 py-3 rounded-md font-mono text-sm">{baseUrlDisplay}</code>
+          <button
+            onClick={() => handleCopy(baseUrlDisplay, 'baseurl')}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            {copied === 'baseurl' ? 'Copied!' : 'Copy'}
+          </button>
         </div>
-      </section>
+      </div>
 
       {/* API Key Section */}
-      <section>
-        <div className="bg-white shadow rounded-lg p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-900" data-testid="api-key-section">
-              API Key
-            </h2>
-            {hasApiKeys ? (
-              <Link
-                href="/admin/ai"
-                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                data-testid="manage-api-keys-link"
-              >
-                Manage API Keys →
-              </Link>
-            ) : (
-              <Link
-                href="/admin/ai"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
-                data-testid="create-api-key-btn"
-              >
-                Create API Key
-              </Link>
-            )}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">API Key</h2>
+        {!hasApiKeys ? (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+            <p className="text-yellow-800">
+              <strong>No API keys found.</strong>{' '}
+              <a href="/admin/ai" className="underline font-medium">
+                Create an API key
+              </a>{' '}
+              to get started.
+            </p>
           </div>
-          {hasApiKeys ? (
-            <>
-              <div className="flex items-center gap-3">
-                <code className="flex-1 bg-gray-100 px-4 py-2 rounded-md text-sm font-mono break-all">
-                  {apiKeyCode}
-                </code>
-                <button
-                  onClick={() => copyToClipboard(apiKeyCode, 'key')}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-md text-sm font-medium"
-                  data-testid="copy-api-key-btn"
-                >
-                  {copiedKey ? 'Copied!' : 'Copy'}
-                </button>
+        ) : (
+          <>
+            <p className="text-gray-600 mb-4">
+              Enter your API key to test the connection. Get your keys from{' '}
+              <a href="/admin/ai" className="text-blue-600 underline">
+                API Keys management
+              </a>
+              .
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">API Key</label>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="pulse_key_..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
-              <p className="mt-2 text-sm text-gray-600">
-                Replace <code className="bg-gray-100 px-1 py-0.5 rounded">{apiKeyCode}</code> with your actual API key from{' '}
-                <Link href="/admin/ai" className="text-blue-600 hover:underline">API Keys</Link>
-              </p>
-            </>
-          ) : (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-              <p className="text-sm text-yellow-800">
-                No API keys found. <Link href="/admin/ai" className="underline font-medium">Create an API key</Link> to use the OpenAI-compatible endpoints.
-              </p>
+              <button
+                onClick={handleTestConnection}
+                disabled={testing}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {testing ? 'Testing...' : 'Test Connection'}
+              </button>
+              {testResult && (
+                <div
+                  className={`p-4 rounded-md ${
+                    testResult.success
+                      ? 'bg-green-50 border border-green-200 text-green-800'
+                      : 'bg-red-50 border border-red-200 text-red-800'
+                  }`}
+                >
+                  {testResult.message}
+                </div>
+              )}
             </div>
-          )}
+          </>
+        )}
+      </div>
+
+      {/* Quick Start Section */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Quick Start</h2>
+        <p className="text-gray-600 mb-4">Test the API with a simple cURL command:</p>
+        <div className="relative">
+          <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
+            <code>{curlSnippet}</code>
+          </pre>
+          <button
+            onClick={() => handleCopy(curlSnippet, 'curl')}
+            className="absolute top-2 right-2 px-3 py-1 bg-gray-700 text-white text-sm rounded hover:bg-gray-600"
+          >
+            {copied === 'curl' ? 'Copied!' : 'Copy'}
+          </button>
         </div>
-      </section>
+      </div>
 
-      {/* Code Snippets Section */}
-      <section>
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4" data-testid="code-snippets-section">
-            Code Snippets
-          </h2>
-
-          <div className="space-y-6">
-            {/* cURL */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">cURL</h3>
-              <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-                <code>{`curl ${baseUrlCode}/chat/completions \\
-  -H "Authorization: Bearer ${apiKeyCode}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "gpt-4",
-    "messages": [
-      {"role": "user", "content": "Hello!"}
-    ]
-  }'`}</code>
-              </pre>
-            </div>
-
-            {/* Node.js (fetch) */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Node.js (fetch)</h3>
-              <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-                <code>{`const response = await fetch('${baseUrlCode}/chat/completions', {
-  method: 'POST',
-  headers: {
-    'Authorization': \`Bearer ${apiKeyCode}\`,
-    'Content-Type': 'application/json',
-    'x-pulse-app': 'your-app-id', // Optional attribution
-  },
-  body: JSON.stringify({
-    model: 'gpt-4',
-    messages: [{ role: 'user', content: 'Hello!' }],
-  }),
-});
-
-const data = await response.json();
-console.log(data);`}</code>
-              </pre>
-            </div>
-
-            {/* Python (requests) */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Python (requests)</h3>
-              <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-                <code>{`import requests
-
-response = requests.post(
-    '${baseUrlCode}/chat/completions',
-    headers={
-        'Authorization': f'Bearer ${apiKeyCode}',
-        'Content-Type': 'application/json',
-        'x-pulse-app': 'your-app-id',  # Optional attribution
-    },
-    json={
-        'model': 'gpt-4',
-        'messages': [{'role': 'user', 'content': 'Hello!'}],
-    },
-)
-
-data = response.json()
-print(data)`}</code>
-              </pre>
-            </div>
-
-            {/* OpenAI SDK (Node.js) */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">OpenAI SDK (Node.js)</h3>
-              <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-                <code>{`import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: '${apiKeyCode}',
-  baseURL: '${baseUrlCode}', // Override base URL
-});
-
-const completion = await openai.chat.completions.create({
-  model: 'gpt-4',
-  messages: [{ role: 'user', content: 'Hello!' }],
-});
-
-console.log(completion.choices[0].message);`}</code>
-              </pre>
-            </div>
-
-            {/* Vercel AI SDK */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Vercel AI SDK</h3>
-              <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-                <code>{`import { openai } from '@ai-sdk/openai';
-import { generateText } from 'ai';
-
-const result = await generateText({
-  model: openai('gpt-4', {
-    baseURL: '${baseUrlCode}',
-    apiKey: '${apiKeyCode}',
-  }),
-  prompt: 'Hello!',
-});
-
-console.log(result.text);`}</code>
-              </pre>
-            </div>
-
-            {/* LangChain */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">LangChain</h3>
-              <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-                <code>{`import { ChatOpenAI } from '@langchain/openai';
-
-const model = new ChatOpenAI({
-  openAIApiKey: '${apiKeyCode}',
-  configuration: {
-    baseURL: '${baseUrlCode}',
-  },
-});
-
-const response = await model.invoke('Hello!');
-console.log(response);`}</code>
-              </pre>
+      {/* SDK Installation */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">SDK Installation</h2>
+        <p className="text-gray-600 mb-4">
+          Install the Pulse OpenAI SDK for a better developer experience:
+        </p>
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">npm</h3>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-gray-100 px-4 py-3 rounded-md font-mono text-sm">
+                npm install @pulse/openai openai
+              </code>
+              <button
+                onClick={() => handleCopy('npm install @pulse/openai openai', 'npm')}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                {copied === 'npm' ? 'Copied!' : 'Copy'}
+              </button>
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* Attribution Headers Section */}
-      <section>
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4" data-testid="attribution-headers-section">
-            Attribution Headers (Optional)
-          </h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Use these headers to track costs and usage by app, project, or client. If not provided, defaults from your API key will be used.
-          </p>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <code className="bg-gray-100 px-2 py-1 rounded text-sm">x-pulse-app</code>
-              <span className="text-sm text-gray-600">App ID for attribution</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <code className="bg-gray-100 px-2 py-1 rounded text-sm">x-pulse-project</code>
-              <span className="text-sm text-gray-600">Project ID for attribution</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <code className="bg-gray-100 px-2 py-1 rounded text-sm">x-pulse-client</code>
-              <span className="text-sm text-gray-600">Client ID for attribution</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <code className="bg-gray-100 px-2 py-1 rounded text-sm">x-pulse-team</code>
-              <span className="text-sm text-gray-600">Team ID for attribution</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Quick Links */}
-      <section>
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Links</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Link
-              href="/admin/ai"
-              className="block p-4 bg-white rounded-md border border-gray-200 hover:border-blue-300 hover:shadow-sm transition"
-            >
-              <h3 className="font-medium text-gray-900">Manage API Keys</h3>
-              <p className="text-sm text-gray-600 mt-1">Create and manage your API keys</p>
-            </Link>
-            <Link
-              href="/admin/integrations/ai"
-              className="block p-4 bg-white rounded-md border border-gray-200 hover:border-blue-300 hover:shadow-sm transition"
-            >
-              <h3 className="font-medium text-gray-900">AI Integrations</h3>
-              <p className="text-sm text-gray-600 mt-1">Configure AI providers and model routes</p>
-            </Link>
-            <Link
-              href="/developer"
-              className="block p-4 bg-white rounded-md border border-gray-200 hover:border-blue-300 hover:shadow-sm transition"
-            >
-              <h3 className="font-medium text-gray-900">Developer Portal</h3>
-              <p className="text-sm text-gray-600 mt-1">View API keys and integration details</p>
-            </Link>
-            <Link
-              href="/governance/ai-logs"
-              className="block p-4 bg-white rounded-md border border-gray-200 hover:border-blue-300 hover:shadow-sm transition"
-            >
-              <h3 className="font-medium text-gray-900">AI Logs</h3>
-              <p className="text-sm text-gray-600 mt-1">View request logs and costs</p>
-            </Link>
-          </div>
-        </div>
-      </section>
+      {/* Documentation Links */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-blue-900 mb-2">Need Help?</h3>
+        <ul className="list-disc list-inside space-y-2 text-blue-800">
+          <li>
+            <a href="/admin/ai" className="underline">
+              Manage API Keys
+            </a>
+          </li>
+          <li>
+            <a href="/developer" className="underline">
+              Developer Portal
+            </a>
+          </li>
+        </ul>
+      </div>
     </div>
   )
 }
-

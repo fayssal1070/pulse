@@ -93,7 +93,7 @@ class PulseOpenAIWithAttribution {
   /**
    * Chat completions with attribution headers
    */
-  async chat = {
+  chat = {
     completions: {
       create: async (params: Parameters<OpenAI['chat']['completions']['create']>[0], options?: any) => {
         const headers: Record<string, string> = {}
@@ -125,7 +125,7 @@ class PulseOpenAIWithAttribution {
   /**
    * Embeddings with attribution headers
    */
-  async embeddings = {
+  embeddings = {
     create: async (params: Parameters<OpenAI['embeddings']['create']>[0], options?: any) => {
       const headers: Record<string, string> = {}
       

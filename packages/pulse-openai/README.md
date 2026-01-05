@@ -18,7 +18,7 @@ pnpm add @pulse/openai openai
 import { PulseOpenAI } from '@pulse/openai'
 
 const client = new PulseOpenAI({
-  baseURL: 'https://your-pulse-instance.com/api/v1',
+  baseURL: 'https://pulse-sigma-eight.vercel.app/api/v1',
   apiKey: 'your_pulse_ai_gateway_key',
 })
 
@@ -29,6 +29,16 @@ const completion = await client.chat.completions.create({
 
 console.log(completion.choices[0].message.content)
 ```
+
+## Base URL
+
+The Pulse API base URL is: **https://pulse-sigma-eight.vercel.app/api/v1**
+
+## API Key
+
+Use your Pulse AI Gateway Key as the `apiKey` parameter. Get your key from the Pulse dashboard at `/developer` or `/admin/ai`.
+
+The API key is sent in the `Authorization: Bearer <key>` header automatically.
 
 ## Attribution
 
@@ -48,9 +58,15 @@ const completion = await clientWithAttribution.chat.completions.create({
 })
 ```
 
+This automatically sets the following headers:
+- `x-pulse-app`: Your app ID
+- `x-pulse-project`: Your project ID
+- `x-pulse-client`: Your client ID
+- `x-pulse-team`: Your team ID
+
 ## Streaming
 
-Streaming is supported:
+Streaming is fully supported:
 
 ```typescript
 const stream = await client.chat.completions.create({
@@ -123,6 +139,23 @@ async function main() {
 main().catch(console.error)
 ```
 
+## Error Handling
+
+The SDK includes automatic retry with exponential backoff and timeout handling (via the underlying OpenAI SDK):
+
+```typescript
+try {
+  const completion = await client.chat.completions.create({
+    model: 'gpt-4',
+    messages: [{ role: 'user', content: 'Hello!' }],
+  })
+} catch (error) {
+  if (error instanceof Error) {
+    console.error('Request failed:', error.message)
+  }
+}
+```
+
 ## API Reference
 
 ### `PulseOpenAI`
@@ -135,7 +168,7 @@ Main client class.
 new PulseOpenAI(config: PulseClientConfig)
 ```
 
-- `config.baseURL`: Pulse API base URL (e.g., `https://pulse.example.com/api/v1`)
+- `config.baseURL`: Pulse API base URL (e.g., `https://pulse-sigma-eight.vercel.app/api/v1`)
 - `config.apiKey`: Pulse AI Gateway Key
 - `config.organization`: Optional organization ID
 
@@ -158,4 +191,3 @@ interface AttributionOptions {
 ## License
 
 MIT
-
