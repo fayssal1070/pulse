@@ -1,0 +1,30 @@
+{
+  "name": "@pulse/openai",
+  "version": "0.1.0",
+  "description": "OpenAI-compatible client for Pulse AI Gateway",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "pulse",
+    "openai",
+    "ai",
+    "gateway"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "openai": "^4.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "openai": "^4.0.0"
+  }
+}
+

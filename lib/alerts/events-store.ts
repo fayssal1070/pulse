@@ -5,7 +5,6 @@
 import { prisma } from '@/lib/prisma'
 import type { AlertEventPayload } from './rules-engine'
 import { dispatchWebhook } from '@/lib/webhooks/dispatcher'
-import { dispatchWebhook } from '@/lib/webhooks/dispatcher'
 
 /**
  * Check if alert should trigger (cooldown + dedup)

@@ -9,6 +9,7 @@ import { requireRole } from '@/lib/auth/rbac'
 import { prisma } from '@/lib/prisma'
 import { randomBytes } from 'crypto'
 import { dispatchWebhook } from '@/lib/webhooks/dispatcher'
+import { encryptWebhookSecret } from '@/lib/webhooks/crypto'
 
 export async function GET(request: NextRequest) {
   try {
@@ -63,14 +64,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate secret (32 bytes, hex)
-    const secret = randomBytes(32).toString('hex')
+    // Generate secret (32 bytes, hex) and encrypt
+    const plainSecret = randomBytes(32).toString('hex')
+    const { secretEnc, secretHash } = encryptWebhookSecret(plainSecret)
 
     const webhook = await prisma.orgWebhook.create({
       data: {
         orgId: activeOrg.id,
         url,
-        secret,
+        secretEnc,
+        secretHash,
         events,
         enabled: enabled !== false,
       },
