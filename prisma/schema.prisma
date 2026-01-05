@@ -61,6 +61,7 @@ model Organization {
   cronRuns                CronRun[]
   aiProviderConnections   AiProviderConnection[]
   aiModelRoutes           AiModelRoute[]
+  webhooks                OrgWebhook[]
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
@@ -595,4 +596,20 @@ model ApiKeyUsageWindow {
   @@unique([keyId, windowStart])
   @@index([keyId])
   @@index([windowStart])
+}
+
+// Organization webhooks for events (cost_event, alert_event, ai_request)
+model OrgWebhook {
+  id           String       @id @default(cuid())
+  orgId        String
+  url          String // Webhook URL
+  secret       String // HMAC secret for signature
+  enabled      Boolean      @default(true)
+  events       String[] // Array of event types: "cost_event.created", "alert_event.triggered", "ai_request.completed"
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([orgId, enabled])
 }
