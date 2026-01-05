@@ -44,6 +44,7 @@ export default function E2EChecklistClient({
   const [checks, setChecks] = useState(initialChecks)
   const [loading, setLoading] = useState<string | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [openAITestResult, setOpenAITestResult] = useState<OpenAISmokeTestResult | null>(null)
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message })
@@ -104,11 +105,37 @@ export default function E2EChecklistClient({
     }
   }
 
+  const handleRunOpenAISmoke = async () => {
+    setLoading('openai-smoke')
+    setOpenAITestResult(null)
+    try {
+      const res = await fetch('/api/admin/e2e/run-openai-smoke', {
+        method: 'POST',
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setOpenAITestResult(data)
+        if (data.success) {
+          showToast('success', 'OpenAI smoke tests passed!')
+        } else {
+          showToast('error', 'OpenAI smoke tests failed. Check details below.')
+        }
+      } else {
+        showToast('error', data.error || 'Failed to run OpenAI smoke tests')
+      }
+    } catch (error: any) {
+      showToast('error', error.message || 'Failed to run OpenAI smoke tests')
+    } finally {
+      setLoading(null)
+    }
+  }
+
   const handleCopyJSON = () => {
     const json = JSON.stringify(
       {
         checks,
         lastCronRuns,
+        openAITests: openAITestResult,
         timestamp: new Date().toISOString(),
       },
       null,
@@ -170,6 +197,70 @@ export default function E2EChecklistClient({
           ok={checks.cronCur}
         />
         <CheckCard id="notifications" label="Notifications preferences existantes" ok={checks.notifications} />
+      </div>
+
+      {/* OpenAI Compat API Section */}
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">OpenAI Compat API</h2>
+        <button
+          data-testid="btn-run-openai-smoke"
+          onClick={handleRunOpenAISmoke}
+          disabled={loading !== null}
+          className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+        >
+          {loading === 'openai-smoke' ? 'Running tests...' : 'Run OpenAI Smoke Tests'}
+        </button>
+
+        {openAITestResult && (
+          <div className="bg-white border rounded-lg p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">
+                Test Results ({openAITestResult.totalDurationMs}ms)
+              </h3>
+              <span
+                className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  openAITestResult.success
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-red-100 text-red-800'
+                }`}
+              >
+                {openAITestResult.success ? 'All Passed' : 'Some Failed'}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {openAITestResult.tests.map((test, idx) => (
+                <div
+                  key={idx}
+                  className={`p-3 rounded border ${
+                    test.passed
+                      ? 'bg-green-50 border-green-200'
+                      : 'bg-red-50 border-red-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{test.name}</span>
+                    <span className={test.passed ? 'text-green-600' : 'text-red-600'}>
+                      {test.passed ? '✓' : '✗'} {test.durationMs}ms
+                    </span>
+                  </div>
+                  {test.error && (
+                    <div className="mt-2 text-sm text-red-700">{test.error}</div>
+                  )}
+                  {test.details && (
+                    <div className="mt-2 text-xs text-gray-600">
+                      {JSON.stringify(test.details, null, 2)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {openAITestResult.cleanupError && (
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                Cleanup warning: {openAITestResult.cleanupError}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex gap-4 mb-6">
