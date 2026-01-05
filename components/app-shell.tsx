@@ -155,6 +155,19 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
                   Billing
                 </Link>
               )}
+              <Link
+                href="/connect"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                  isActive('/connect')
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+                data-testid="nav-connect"
+              >
+                <span className="mr-3">🔌</span>
+                Connect
+              </Link>
               {(isAdmin || true) && (
                 <>
                   <Link

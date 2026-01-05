@@ -8,6 +8,7 @@ import { checkPolicies, type RequestContext } from './policy'
 import { estimateCost, getProviderFromModel } from './pricing'
 import { computeBudgetStatus } from '@/lib/alerts/engine'
 import type { CostEventDimensions } from '@/lib/cost-events/types'
+import { dispatchWebhook } from '@/lib/webhooks/dispatcher'
 
 export interface AiRequestInput {
   orgId: string
@@ -419,7 +420,7 @@ export async function processAiRequest(
       )
       .digest('hex')
 
-    await prisma.costEvent.create({
+    const costEvent = await prisma.costEvent.create({
       data: {
         orgId: input.orgId,
         source: 'AI',
@@ -448,6 +449,29 @@ export async function processAiRequest(
         uniqueHash,
         ingestionBatchId: null,
       },
+    })
+
+    // Dispatch webhooks (fail-soft, async)
+    dispatchWebhook(input.orgId, 'cost_event.created', {
+      costEventId: costEvent.id,
+      amountEur: finalCost,
+      provider,
+      model: input.model,
+      tokens: apiResponse.totalTokens,
+    }).catch(() => {
+      // Fail-soft: already handled in dispatchWebhook
+    })
+
+    dispatchWebhook(input.orgId, 'ai_request.completed', {
+      requestLogId: requestLog.id,
+      provider,
+      model: input.model,
+      tokensIn: apiResponse.inputTokens,
+      tokensOut: apiResponse.outputTokens,
+      costEur: finalCost,
+      latencyMs,
+    }).catch(() => {
+      // Fail-soft: already handled in dispatchWebhook
     })
 
     return {

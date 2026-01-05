@@ -7,6 +7,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateApiKey } from '@/lib/ai/api-key-auth'
 import { checkRateLimit } from '@/lib/ratelimit'
+import { callOpenAIEmbeddings } from '@/lib/ai/providers/openai-streaming'
+import { decryptSecret } from '@/lib/ai/providers/crypto'
+import { prisma } from '@/lib/prisma'
+import { AiProvider, AiProviderConnectionStatus } from '@prisma/client'
+import { estimateCost } from '@/lib/ai/pricing'
+import { createHash } from 'crypto'
 
 export async function POST(request: NextRequest) {
   try {
@@ -62,27 +68,135 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // TODO: Implement embeddings via provider router
-    // For now, return placeholder response
-    const inputs = Array.isArray(input) ? input : [input]
-    const embeddingSize = 1536 // OpenAI ada-002 size
-
-    const embeddings = inputs.map(() => {
-      // Placeholder: random embeddings (same shape as OpenAI)
-      return Array.from({ length: embeddingSize }, () => Math.random() * 0.02 - 0.01)
+    // Find route and connection for embeddings
+    const routes = await prisma.aiModelRoute.findMany({
+      where: {
+        orgId: key.orgId,
+        model,
+        enabled: true,
+      },
+      orderBy: { priority: 'asc' },
+      take: 1,
     })
+
+    if (routes.length === 0) {
+      return NextResponse.json(
+        {
+          error: {
+            message: `No provider connected for model ${model}`,
+            type: 'invalid_request_error',
+            param: 'model',
+            code: 'model_not_found',
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    const route = routes[0]
+
+    // Check if provider supports embeddings (currently only OpenAI)
+    if (route.provider !== AiProvider.OPENAI) {
+      return NextResponse.json(
+        {
+          error: {
+            message: `Embeddings not supported for provider ${route.provider}. Configure a provider route that supports embeddings (e.g., OpenAI).`,
+            type: 'invalid_request_error',
+            param: 'model',
+            code: 'provider_not_supported',
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    const connection = await prisma.aiProviderConnection.findFirst({
+      where: {
+        orgId: key.orgId,
+        provider: route.provider,
+        status: AiProviderConnectionStatus.ACTIVE,
+      },
+    })
+
+    if (!connection) {
+      return NextResponse.json(
+        {
+          error: {
+            message: `No active connection for provider ${route.provider}`,
+            type: 'invalid_request_error',
+            code: 'provider_not_configured',
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    const apiKey = decryptSecret(connection.encryptedApiKey)
+    const inputs = Array.isArray(input) ? input : [input]
+
+    // Call OpenAI embeddings API
+    const embeddingsResult = await callOpenAIEmbeddings(apiKey, inputs, model)
+
+    // Estimate cost and log (simplified - embeddings cost is usually very low)
+    const estimatedCost = estimateCost(model, embeddingsResult.tokensIn, 0)
+    const requestId = `emb_${Date.now()}_${Math.random().toString(36).substring(7)}`
+
+    // Log request (async, don't block)
+    prisma.aiRequestLog
+      .create({
+        data: {
+          orgId: key.orgId,
+          userId: key.createdByUserId,
+          provider: 'openai',
+          model,
+          promptHash: createHash('sha256')
+            .update(inputs.join('\n'))
+            .digest('hex'),
+          inputTokens: embeddingsResult.tokensIn,
+          outputTokens: 0,
+          totalTokens: embeddingsResult.tokensIn,
+          estimatedCostEur: estimatedCost,
+          statusCode: 200,
+          rawRef: { requestId, type: 'embeddings' },
+        },
+      })
+      .catch((err) => console.error('Embeddings log error:', err))
+
+    // Create cost event (async)
+    prisma.costEvent
+      .create({
+        data: {
+          orgId: key.orgId,
+          source: 'AI',
+          occurredAt: new Date(),
+          amountEur: estimatedCost,
+          currency: 'EUR',
+          provider: 'openai',
+          resourceType: 'EMBEDDINGS',
+          service: 'OpenAI',
+          usageType: 'tokens',
+          quantity: embeddingsResult.tokensIn,
+          unit: 'TOKENS',
+          costCategory: 'AI',
+          uniqueHash: createHash('sha256')
+            .update(`${key.orgId}|${requestId}|${embeddingsResult.tokensIn}`)
+            .digest('hex'),
+          rawRef: { requestId, type: 'embeddings' },
+        },
+      })
+      .catch((err) => console.error('Embeddings cost event error:', err))
 
     const response = {
       object: 'list',
-      data: embeddings.map((embedding, index) => ({
+      data: embeddingsResult.embeddings.map((embedding, index) => ({
         object: 'embedding',
         embedding,
         index,
       })),
-      model,
+      model: embeddingsResult.model,
       usage: {
-        prompt_tokens: inputs.reduce((sum, text) => sum + Math.ceil((text?.length || 0) / 4), 0),
-        total_tokens: inputs.reduce((sum, text) => sum + Math.ceil((text?.length || 0) / 4), 0),
+        prompt_tokens: embeddingsResult.tokensIn,
+        total_tokens: embeddingsResult.tokensIn,
       },
     }
 

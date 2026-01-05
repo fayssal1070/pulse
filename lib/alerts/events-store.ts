@@ -4,6 +4,8 @@
 
 import { prisma } from '@/lib/prisma'
 import type { AlertEventPayload } from './rules-engine'
+import { dispatchWebhook } from '@/lib/webhooks/dispatcher'
+import { dispatchWebhook } from '@/lib/webhooks/dispatcher'
 
 /**
  * Check if alert should trigger (cooldown + dedup)
@@ -87,6 +89,17 @@ export async function createAlertEvent(
     })
 
     return newEvent
+  })
+
+  // Dispatch webhook (fail-soft, async - after transaction)
+  dispatchWebhook(orgId, 'alert_event.triggered', {
+    alertEventId: event.id,
+    alertId,
+    severity: payload.severity,
+    amountEUR: payload.amountEUR,
+    message: payload.message,
+  }).catch(() => {
+    // Fail-soft: already handled in dispatchWebhook
   })
 
   return event.id

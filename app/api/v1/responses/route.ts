@@ -1,6 +1,7 @@
 /**
- * OpenAI-compatible chat completions endpoint
- * POST /api/v1/chat/completions
+ * OpenAI-compatible responses endpoint (new API)
+ * POST /api/v1/responses
+ * Maps to chat/completions internally
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -27,34 +28,25 @@ export async function POST(request: NextRequest) {
             error: {
               message: 'Rate limit exceeded',
               type: 'rate_limit_error',
-              param: null,
               code: 'rate_limit_exceeded',
             },
           },
-          {
-            status: 429,
-            headers: {
-              'Retry-After': '60',
-              'X-RateLimit-Limit': key.rateLimitRpm.toString(),
-              'X-RateLimit-Remaining': Math.max(0, rateLimitResult.remaining).toString(),
-              'X-RateLimit-Reset': Math.floor(rateLimitResult.resetAt.getTime() / 1000).toString(),
-            },
-          }
+          { status: 429 }
         )
       }
     }
 
-    // Parse OpenAI request body
+    // Parse request body
     const body = await request.json().catch(() => ({}))
-    const { model, messages, max_tokens, temperature, stream } = body
+    const { input, model = 'gpt-4', stream } = body
 
-    if (!model) {
+    if (!input) {
       return NextResponse.json(
         {
           error: {
-            message: 'model is required',
+            message: 'input is required',
             type: 'invalid_request_error',
-            param: 'model',
+            param: 'input',
             code: 'missing_parameter',
           },
         },
@@ -62,60 +54,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json(
-        {
-          error: {
-            message: 'messages is required and must be a non-empty array',
-            type: 'invalid_request_error',
-            param: 'messages',
-            code: 'missing_parameter',
-          },
-        },
-        { status: 400 }
-      )
-    }
-
-    // Resolve attribution from headers or key defaults
+    // Resolve attribution
     const attribution = resolveAttribution(request, {
       defaultAppId: key.defaultAppId,
       defaultProjectId: key.defaultProjectId,
       defaultClientId: key.defaultClientId,
     })
 
-    // Check requireAttribution policy (same as /api/ai/request)
-    const { prisma } = await import('@/lib/prisma')
-    const policies = await prisma.aiPolicy.findMany({
-      where: {
-        orgId: key.orgId,
-        enabled: true,
-      },
-    })
-    const hasRequireAttribution = policies.some((p: any) => p.enabled && p.requireAttribution)
-    if (hasRequireAttribution && !attribution.appId) {
-      return NextResponse.json(
-        {
-          error: {
-            message: 'appId required by policy. Set x-pulse-app header or configure defaultAppId on your API key.',
-            type: 'invalid_request_error',
-            param: 'x-pulse-app',
-            code: 'policy_requirement',
-          },
-        },
-        { status: 400 }
-      )
-    }
+    // Convert input to messages format (for chat/completions)
+    const messages = Array.isArray(input)
+      ? input.map((msg) => (typeof msg === 'string' ? { role: 'user', content: msg } : msg))
+      : [{ role: 'user', content: input }]
 
-    // Handle streaming request
+    // Handle streaming
     if (stream === true) {
-      const { createStreamingResponse } = await import('./completions-stream')
+      const { createStreamingResponse } = await import('../chat/completions-stream')
       const streamResponse = await createStreamingResponse(
         key.orgId,
         key.createdByUserId,
         model,
         messages,
-        max_tokens,
-        temperature,
+        undefined,
+        undefined,
         request.headers.get('x-pulse-team') || undefined,
         attribution.projectId,
         attribution.appId,
@@ -131,20 +91,18 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Process non-streaming request through gateway
+    // Process through gateway (same as chat/completions)
     const gatewayResponse = await processAiRequest({
       orgId: key.orgId,
-      userId: key.createdByUserId, // Use key creator as userId
-      teamId: request.headers.get('x-pulse-team') || undefined, // Allow team header
+      userId: key.createdByUserId,
+      teamId: request.headers.get('x-pulse-team') || undefined,
       projectId: attribution.projectId,
       appId: attribution.appId,
       clientId: attribution.clientId,
       model,
       messages,
-      maxTokens: max_tokens,
-      temperature,
       metadata: {
-        source: 'openai-compat-v1',
+        source: 'openai-compat-v1-responses',
         apiKeyId: key.id,
       },
     })
@@ -155,7 +113,6 @@ export async function POST(request: NextRequest) {
           error: {
             message: gatewayResponse.error || 'AI request failed',
             type: 'server_error',
-            param: null,
             code: 'internal_error',
           },
         },
@@ -163,22 +120,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Format OpenAI-compatible response
+    // Format OpenAI responses API format (simplified - maps to chat format)
     const response = {
-      id: `chatcmpl-${gatewayResponse.requestId || Date.now()}`,
-      object: 'chat.completion',
+      id: `resp_${gatewayResponse.requestId || Date.now()}`,
+      object: 'response',
       created: Math.floor(Date.now() / 1000),
       model: gatewayResponse.model || model,
-      choices: [
-        {
-          index: 0,
-          message: {
-            role: 'assistant',
-            content: gatewayResponse.content || '',
-          },
-          finish_reason: 'stop',
-        },
-      ],
+      output_text: {
+        text: gatewayResponse.content || '',
+      },
       usage: {
         prompt_tokens: gatewayResponse.inputTokens || 0,
         completion_tokens: gatewayResponse.outputTokens || 0,
@@ -188,13 +138,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(response)
   } catch (error: any) {
-    console.error('Chat completions error:', error)
+    console.error('Responses error:', error)
     return NextResponse.json(
       {
         error: {
           message: error.message || 'Internal server error',
           type: 'server_error',
-          param: null,
           code: 'internal_error',
         },
       },
