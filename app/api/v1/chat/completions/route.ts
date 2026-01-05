@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
 
     // Handle streaming request
     if (stream === true) {
-      const { createStreamingResponse } = await import('./completions-stream')
+      const { createStreamingResponse } = await import('../completions-stream')
       const streamResponse = await createStreamingResponse(
         key.orgId,
         key.createdByUserId,
