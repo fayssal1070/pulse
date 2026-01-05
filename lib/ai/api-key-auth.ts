@@ -20,27 +20,28 @@ export interface ApiKeyAuthResult {
 }
 
 /**
- * Authenticate API key from Authorization Bearer token
+ * Authenticate API key from Authorization Bearer token or x-api-key header
  */
 export async function authenticateApiKey(
   request: NextRequest
 ): Promise<{ success: true; result: ApiKeyAuthResult } | { success: false; error: string; status: number }> {
+  // Try Authorization header first
   const authHeader = request.headers.get('Authorization')
+  let apiKey: string | null = null
   
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return {
-      success: false,
-      error: 'Missing or invalid Authorization header. Use: Authorization: Bearer <API_KEY>',
-      status: 401,
-    }
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    apiKey = authHeader.substring(7).trim()
   }
-
-  const apiKey = authHeader.substring(7).trim()
+  
+  // Fallback to x-api-key header
+  if (!apiKey) {
+    apiKey = request.headers.get('x-api-key')
+  }
   
   if (!apiKey) {
     return {
       success: false,
-      error: 'API key is required',
+      error: 'Missing API key. Use: Authorization: Bearer <API_KEY> or x-api-key: <API_KEY>',
       status: 401,
     }
   }
@@ -48,9 +49,13 @@ export async function authenticateApiKey(
   // Hash API key (same as when created)
   const keyHash = createHash('sha256').update(apiKey).digest('hex')
 
-  // Find key in database
-  const key = await prisma.aiGatewayKey.findUnique({
-    where: { keyHash },
+  // Find key in database (use findFirst with keyHash since it's indexed)
+  const key = await prisma.aiGatewayKey.findFirst({
+    where: { 
+      keyHash,
+      status: 'active',
+      enabled: true,
+    },
     select: {
       id: true,
       orgId: true,
@@ -67,17 +72,8 @@ export async function authenticateApiKey(
   if (!key) {
     return {
       success: false,
-      error: 'Invalid API key',
+      error: 'Invalid or inactive API key',
       status: 401,
-    }
-  }
-
-  // Check if key is active and enabled
-  if (key.status !== 'active' || !key.enabled) {
-    return {
-      success: false,
-      error: 'API key is revoked or disabled',
-      status: 403,
     }
   }
 
