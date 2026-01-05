@@ -22,6 +22,19 @@ interface E2EChecklistClientProps {
   organizationId: string
 }
 
+interface OpenAISmokeTestResult {
+  success: boolean
+  tests: Array<{
+    name: string
+    passed: boolean
+    error?: string
+    durationMs?: number
+    details?: any
+  }>
+  totalDurationMs: number
+  cleanupError?: string
+}
+
 export default function E2EChecklistClient({
   initialChecks,
   lastCronRuns,
