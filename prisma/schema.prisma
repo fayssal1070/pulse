@@ -618,20 +618,21 @@ model OrgWebhook {
 }
 
 model OrgWebhookDelivery {
-  id          String      @id @default(cuid())
+  id          String       @id @default(cuid())
   orgId       String
   webhookId   String
   eventType   String // "cost_event.created" | "alert_event.triggered" | "ai_request.completed"
   status      String // "SUCCESS" | "FAIL"
-  attempt     Int         @default(1) // 1, 2, or 3
+  attempt     Int          @default(1) // 1, 2, or 3
   httpStatus  Int? // HTTP status code from webhook endpoint
   error       String? // Error message if failed
   requestId   String? // Unique request ID for this delivery
-  deliveredAt DateTime    @default(now())
-  createdAt   DateTime    @default(now())
+  deliveredAt DateTime     @default(now())
+  createdAt   DateTime     @default(now())
   payloadJson String? // JSON payload (optional, for debugging)
   durationMs  Int? // Delivery duration in milliseconds
-  webhook     OrgWebhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  webhook     OrgWebhook   @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([webhookId])
   @@index([eventType])
