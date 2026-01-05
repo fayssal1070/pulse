@@ -18,7 +18,7 @@ export default async function WebhooksAdminPage() {
   }
 
   // Fetch webhooks
-  const webhooks = await prisma.orgWebhook.findMany({
+  const webhooksRaw = await prisma.orgWebhook.findMany({
     where: { orgId: activeOrg.id },
     orderBy: { createdAt: 'desc' },
     select: {
@@ -30,6 +30,13 @@ export default async function WebhooksAdminPage() {
       updatedAt: true,
     },
   })
+
+  // Convert Date to string for client component
+  const webhooks = webhooksRaw.map((w) => ({
+    ...w,
+    createdAt: w.createdAt.toISOString(),
+    updatedAt: w.updatedAt.toISOString(),
+  }))
 
   return (
     <AppShell organizations={organizations} activeOrgId={activeOrg.id} isAdmin={isAdminUser} needsOnboarding={false}>
