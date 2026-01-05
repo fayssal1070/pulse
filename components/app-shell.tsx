@@ -238,6 +238,18 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
                     AI Providers
                   </Link>
                   <Link
+                    href="/admin/integrations/webhooks"
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                      isActive('/admin/integrations/webhooks')
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="mr-3">🔗</span>
+                    Webhooks
+                  </Link>
+                  <Link
                     href="/admin/e2e"
                     onClick={() => setSidebarOpen(false)}
                     className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
@@ -363,6 +375,17 @@ export default function AppShell({ children, organizations, activeOrgId, hasActi
                   >
                     <span className="mr-3">🤖</span>
                     AI Providers
+                  </Link>
+                  <Link
+                    href="/admin/integrations/webhooks"
+                    className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                      isActive('/admin/integrations/webhooks')
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="mr-3">🔗</span>
+                    Webhooks
                   </Link>
                   <Link
                     href="/admin/e2e"
