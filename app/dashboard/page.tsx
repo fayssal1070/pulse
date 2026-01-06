@@ -24,7 +24,9 @@ import SetupChecklist from '@/components/setup/setup-checklist'
 import OnboardingWarning from '@/components/directory/onboarding-warning'
 import OnboardingBanner from '@/components/onboarding/onboarding-banner'
 import DiagnosticsCard from '@/components/dashboard/diagnostics-card'
+import AISpendCard from '@/components/dashboard/ai-spend-card'
 import Link from 'next/link'
+import { isFinance } from '@/lib/admin-helpers'
 
 export default async function DashboardPage({
   searchParams,
@@ -37,6 +39,7 @@ export default async function DashboardPage({
   const organizations = await getUserOrganizations(user.id)
   const activeOrg = await requireActiveOrgOrRedirect(user.id, { nextPath: '/dashboard' })
   const isAdminUser = await isAdmin()
+  const isFinanceUser = await isFinance()
 
   // Check onboarding status (show banner if incomplete, don't redirect)
   const activeOrgId = activeOrg.id
@@ -108,6 +111,13 @@ export default async function DashboardPage({
 
             {/* KPIs */}
             <KPICards kpis={kpis} />
+
+            {/* AI Spend Card (Admin/Finance only) */}
+            {(isAdminUser || isFinanceUser) && (
+              <div className="mb-6">
+                <AISpendCard />
+              </div>
+            )}
 
             {/* Trends */}
             <div className="mb-6">
