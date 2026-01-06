@@ -55,14 +55,15 @@ export async function POST(request: NextRequest) {
     await prisma.cronRun.create({
       data: {
         type: 'RETRY_NOTIFICATIONS',
+        status: failCount === 0 ? 'SUCCESS' : 'FAIL',
         startedAt: now,
-        completedAt: new Date(),
-        success: failCount === 0,
-        processedOrgs: new Set(pendingRetries.map((d) => d.orgId)).size,
-        result: JSON.stringify({
+        finishedAt: new Date(),
+        error: failCount > 0 ? errors.slice(0, 1).join('; ') : null,
+        metaJson: JSON.stringify({
           total: pendingRetries.length,
           success: successCount,
           failed: failCount,
+          processedOrgs: new Set(pendingRetries.map((d) => d.orgId)).size,
           errors: errors.slice(0, 10), // Limit error details
         }),
       },
