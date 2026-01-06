@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateApiKey, resolveAttribution } from '@/lib/ai/api-key-auth'
+import { authenticateApiKey, resolveAttribution, checkModelRestrictions, checkCostLimits } from '@/lib/ai/api-key-auth'
 import { checkRateLimit } from '@/lib/ratelimit'
 import { processAiRequest } from '@/lib/ai/gateway'
 
@@ -48,6 +48,42 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
     const { model, messages, max_tokens, temperature, stream } = body
 
+    // Check model restrictions (allowed/blocked)
+    if (model) {
+      const modelCheck = checkModelRestrictions(model, key.allowedModels, key.blockedModels)
+      if (!modelCheck.allowed) {
+        return NextResponse.json(
+          {
+            error: {
+              message: modelCheck.reason || 'Model not allowed',
+              type: 'invalid_request_error',
+              param: 'model',
+              code: 'model_restricted',
+            },
+          },
+          { status: 403 }
+        )
+      }
+    }
+
+    // Check cost limits (daily/monthly)
+    if (key.dailyCostLimitEur || key.monthlyCostLimitEur) {
+      const costCheck = await checkCostLimits(key.id, key.orgId, key.dailyCostLimitEur, key.monthlyCostLimitEur)
+      if (!costCheck.withinLimit) {
+        return NextResponse.json(
+          {
+            error: {
+              message: costCheck.reason || 'Cost limit exceeded',
+              type: 'insufficient_quota_error',
+              param: null,
+              code: 'cost_limit_exceeded',
+            },
+          },
+          { status: 403 }
+        )
+      }
+    }
+
     if (!model) {
       return NextResponse.json(
         {
@@ -81,18 +117,26 @@ export async function POST(request: NextRequest) {
       defaultAppId: key.defaultAppId,
       defaultProjectId: key.defaultProjectId,
       defaultClientId: key.defaultClientId,
+      defaultTeamId: key.defaultTeamId,
     })
 
-    // Check requireAttribution policy (same as /api/ai/request)
-    const { prisma } = await import('@/lib/prisma')
-    const policies = await prisma.aiPolicy.findMany({
-      where: {
-        orgId: key.orgId,
-        enabled: true,
-      },
-    })
-    const hasRequireAttribution = policies.some((p: any) => p.enabled && p.requireAttribution)
-    if (hasRequireAttribution && !attribution.appId) {
+    // Check requireAttribution policy (key-level override or org policy)
+    const keyRequiresAttribution = key.requireAttribution !== null ? key.requireAttribution : null
+    let requiresAttribution = keyRequiresAttribution
+
+    if (requiresAttribution === null) {
+      // Fallback to org policy if key doesn't specify
+      const { prisma } = await import('@/lib/prisma')
+      const policies = await prisma.aiPolicy.findMany({
+        where: {
+          orgId: key.orgId,
+          enabled: true,
+        },
+      })
+      requiresAttribution = policies.some((p: any) => p.enabled && p.requireAttribution)
+    }
+
+    if (requiresAttribution && !attribution.appId) {
       return NextResponse.json(
         {
           error: {
@@ -116,7 +160,7 @@ export async function POST(request: NextRequest) {
         messages,
         max_tokens,
         temperature,
-        request.headers.get('x-pulse-team') || undefined,
+        attribution.teamId || request.headers.get('x-pulse-team') || undefined,
         attribution.projectId,
         attribution.appId,
         attribution.clientId
@@ -135,7 +179,7 @@ export async function POST(request: NextRequest) {
     const gatewayResponse = await processAiRequest({
       orgId: key.orgId,
       userId: key.createdByUserId, // Use key creator as userId
-      teamId: request.headers.get('x-pulse-team') || undefined, // Allow team header
+      teamId: attribution.teamId || request.headers.get('x-pulse-team') || undefined,
       projectId: attribution.projectId,
       appId: attribution.appId,
       clientId: attribution.clientId,

@@ -46,7 +46,7 @@ export default async function ConnectPage() {
               <strong>Organization:</strong> {activeOrg.name}
               {!hasApiKeys && (
                 <>
-                  {' '}— <a href="/admin/ai" className="underline font-medium">Create an API key</a> to get started
+                  {' '}— <a href="/admin/api-keys" className="underline font-medium">Create an API key</a> to get started
                 </>
               )}
             </p>

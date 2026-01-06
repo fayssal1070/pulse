@@ -42,11 +42,19 @@ export async function GET(request: Request) {
         RETRY_NOTIFICATIONS: null as any,
       },
       recentErrors: [] as any[],
-      notificationFailures: {
-        byChannel: {} as Record<string, number>,
-        total: 0,
-      },
-    }
+          notificationFailures: {
+            byChannel: {} as Record<string, number>,
+            total: 0,
+          },
+          apiKeys: {
+            active: 0,
+            revoked: 0,
+            neverUsed: 0,
+            lastUsedOldest: null as string | null,
+            lastUsedNewest: null as string | null,
+          },
+          recentKeyAudits: [] as any[],
+        }
 
     // Test DB connection and get latency
     try {

@@ -364,6 +364,57 @@ export default function HealthPageClient() {
           </div>
         </div>
       )}
+
+      {/* API Keys Stats */}
+      {health.apiKeys && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6" data-testid="health-api-keys">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">API Keys</h3>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div>
+              <p className="text-sm text-gray-500">Active</p>
+              <p className="text-lg font-semibold text-green-600">{health.apiKeys.active}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Revoked</p>
+              <p className="text-lg font-semibold text-red-600">{health.apiKeys.revoked}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Never Used</p>
+              <p className="text-lg font-semibold text-yellow-600">{health.apiKeys.neverUsed}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Oldest Usage</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {health.apiKeys.lastUsedOldest ? formatDate(health.apiKeys.lastUsedOldest) : 'N/A'}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Newest Usage</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {health.apiKeys.lastUsedNewest ? formatDate(health.apiKeys.lastUsedNewest) : 'N/A'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Key Audits */}
+      {health.recentKeyAudits && health.recentKeyAudits.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent API Key Audits (Last 20)</h3>
+          <div className="space-y-2">
+            {health.recentKeyAudits.map((audit) => (
+              <div key={audit.id} className="p-3 bg-gray-50 border border-gray-200 rounded">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-medium text-gray-900">{audit.action}</span>
+                  <span className="text-xs text-gray-600">{formatDate(audit.createdAt)}</span>
+                </div>
+                <p className="text-xs text-gray-500">Key ID: {audit.apiKeyId.substring(0, 8)}...</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

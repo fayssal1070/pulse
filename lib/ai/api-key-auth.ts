@@ -14,8 +14,16 @@ export interface ApiKeyAuthResult {
     defaultAppId: string | null
     defaultProjectId: string | null
     defaultClientId: string | null
+    defaultTeamId: string | null
     rateLimitRpm: number | null
     enabled: boolean
+    status: string
+    expiresAt: Date | null
+    allowedModels: string[] | null
+    blockedModels: string[] | null
+    requireAttribution: boolean | null
+    dailyCostLimitEur: number | null
+    monthlyCostLimitEur: number | null
   }
 }
 
@@ -63,9 +71,16 @@ export async function authenticateApiKey(
       defaultAppId: true,
       defaultProjectId: true,
       defaultClientId: true,
+      defaultTeamId: true,
       rateLimitRpm: true,
       enabled: true,
       status: true,
+      expiresAt: true,
+      allowedModels: true,
+      blockedModels: true,
+      requireAttribution: true,
+      dailyCostLimitEur: true,
+      monthlyCostLimitEur: true,
     },
   })
 
@@ -77,6 +92,23 @@ export async function authenticateApiKey(
     }
   }
 
+  // Check expiration
+  if (key.expiresAt && key.expiresAt < new Date()) {
+    return {
+      success: false,
+      error: 'API key has expired',
+      status: 401,
+    }
+  }
+
+  // Update lastUsedAt (fire-and-forget, don't block request)
+  prisma.aiGatewayKey.update({
+    where: { id: key.id },
+    data: { lastUsedAt: new Date() },
+  }).catch((err) => {
+    console.error('Failed to update lastUsedAt:', err)
+  })
+
   return {
     success: true,
     result: {
@@ -87,8 +119,16 @@ export async function authenticateApiKey(
         defaultAppId: key.defaultAppId,
         defaultProjectId: key.defaultProjectId,
         defaultClientId: key.defaultClientId,
+        defaultTeamId: key.defaultTeamId,
         rateLimitRpm: key.rateLimitRpm,
         enabled: key.enabled,
+        status: key.status,
+        expiresAt: key.expiresAt,
+        allowedModels: key.allowedModels as string[] | null,
+        blockedModels: key.blockedModels as string[] | null,
+        requireAttribution: key.requireAttribution,
+        dailyCostLimitEur: key.dailyCostLimitEur ? parseFloat(key.dailyCostLimitEur.toString()) : null,
+        monthlyCostLimitEur: key.monthlyCostLimitEur ? parseFloat(key.monthlyCostLimitEur.toString()) : null,
       },
     },
   }
@@ -103,20 +143,119 @@ export function resolveAttribution(
     defaultAppId: string | null
     defaultProjectId: string | null
     defaultClientId: string | null
+    defaultTeamId: string | null
   }
 ): {
   appId?: string
   projectId?: string
   clientId?: string
+  teamId?: string
 } {
   const appId = request.headers.get('x-pulse-app') || keyDefaults.defaultAppId || undefined
   const projectId = request.headers.get('x-pulse-project') || keyDefaults.defaultProjectId || undefined
   const clientId = request.headers.get('x-pulse-client') || keyDefaults.defaultClientId || undefined
+  const teamId = request.headers.get('x-pulse-team') || keyDefaults.defaultTeamId || undefined
 
   return {
     appId: appId || undefined,
     projectId: projectId || undefined,
     clientId: clientId || undefined,
+    teamId: teamId || undefined,
   }
+}
+
+/**
+ * Check if model is allowed/blocked by key restrictions
+ */
+export function checkModelRestrictions(
+  requestedModel: string,
+  allowedModels: string[] | null,
+  blockedModels: string[] | null
+): { allowed: boolean; reason?: string } {
+  // If blocked list exists and contains this model (or prefix match)
+  if (blockedModels && blockedModels.length > 0) {
+    const isBlocked = blockedModels.some((blocked) => {
+      if (blocked === requestedModel) return true
+      // Support prefix matching: "gpt-4" blocks "gpt-4-turbo"
+      if (requestedModel.startsWith(blocked + '-')) return true
+      return false
+    })
+    if (isBlocked) {
+      return { allowed: false, reason: `Model ${requestedModel} is blocked by API key restrictions` }
+    }
+  }
+
+  // If allowed list exists, model must be in it
+  if (allowedModels && allowedModels.length > 0) {
+    const isAllowed = allowedModels.some((allowed) => {
+      if (allowed === requestedModel) return true
+      // Support prefix matching: "gpt-4" allows "gpt-4-turbo"
+      if (requestedModel.startsWith(allowed + '-')) return true
+      return false
+    })
+    if (!isAllowed) {
+      return { allowed: false, reason: `Model ${requestedModel} is not in the allowed models list for this API key` }
+    }
+  }
+
+  return { allowed: true }
+}
+
+/**
+ * Check daily/monthly cost limits
+ */
+export async function checkCostLimits(
+  keyId: string,
+  orgId: string,
+  dailyLimitEur: number | null,
+  monthlyLimitEur: number | null
+): Promise<{ withinLimit: boolean; reason?: string; currentDaily?: number; currentMonthly?: number }> {
+  if (!dailyLimitEur && !monthlyLimitEur) {
+    return { withinLimit: true }
+  }
+
+  const now = new Date()
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  // Aggregate costs from CostEvent for this key's org (using AiRequestLog to link to key)
+  // For simplicity, we'll check all AI costs for the org in the period
+  // In production, you might want to track per-key costs separately
+
+  if (dailyLimitEur) {
+    const dailyCost = await prisma.costEvent.aggregate({
+      where: {
+        orgId,
+        provider: 'AI',
+        occurredAt: { gte: startOfDay },
+      },
+      _sum: {
+        amountEur: true,
+      },
+    })
+    const currentDaily = dailyCost._sum.amountEur ? parseFloat(dailyCost._sum.amountEur.toString()) : 0
+    if (currentDaily >= dailyLimitEur) {
+      return { withinLimit: false, reason: `Daily cost limit of €${dailyLimitEur} exceeded (current: €${currentDaily.toFixed(2)})`, currentDaily }
+    }
+  }
+
+  if (monthlyLimitEur) {
+    const monthlyCost = await prisma.costEvent.aggregate({
+      where: {
+        orgId,
+        provider: 'AI',
+        occurredAt: { gte: startOfMonth },
+      },
+      _sum: {
+        amountEur: true,
+      },
+    })
+    const currentMonthly = monthlyCost._sum.amountEur ? parseFloat(monthlyCost._sum.amountEur.toString()) : 0
+    if (currentMonthly >= monthlyLimitEur) {
+      return { withinLimit: false, reason: `Monthly cost limit of €${monthlyLimitEur} exceeded (current: €${currentMonthly.toFixed(2)})`, currentMonthly }
+    }
+  }
+
+  return { withinLimit: true }
 }
 

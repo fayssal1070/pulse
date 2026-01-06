@@ -64,6 +64,7 @@ model Organization {
   webhooks                OrgWebhook[]
   webhookDeliveries       OrgWebhookDelivery[]
   notificationDeliveries  NotificationDelivery[]
+  apiKeyAudits            ApiKeyAudit[]
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
@@ -318,29 +319,47 @@ model Budget {
 
 // AI Gateway API Keys
 model AiGatewayKey {
-  id               String              @id @default(cuid())
-  orgId            String
-  keyHash          String              @unique // SHA-256 hash of the API key
-  keyPrefix        String // First 8 chars for display
-  status           String              @default("active") // "active" | "revoked"
-  createdByUserId  String
-  enabled          Boolean             @default(true)
-  defaultAppId     String? // Optional default app for attribution
-  defaultProjectId String? // Optional default project for attribution
-  defaultClientId  String? // Optional default client for attribution
-  rateLimitRpm     Int? // Rate limit per minute (null = unlimited)
-  createdAt        DateTime            @default(now())
-  revokedAt        DateTime?
-  organization     Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  defaultApp       App?                @relation(fields: [defaultAppId], references: [id], onDelete: SetNull)
-  defaultProject   Project?            @relation(fields: [defaultProjectId], references: [id], onDelete: SetNull)
-  defaultClient    Client?             @relation(fields: [defaultClientId], references: [id], onDelete: SetNull)
-  usageWindows     ApiKeyUsageWindow[]
+  id                    String              @id @default(cuid())
+  orgId                 String
+  keyHash               String              @unique // SHA-256 hash of the API key
+  keyPrefix             String // First 8-12 chars for display
+  label                 String? // Optional human-readable label
+  status                String              @default("active") // "active" | "revoked"
+  createdByUserId       String
+  enabled               Boolean             @default(true)
+  // Default attribution
+  defaultAppId          String? // Optional default app for attribution
+  defaultProjectId      String? // Optional default project for attribution
+  defaultClientId       String? // Optional default client for attribution
+  defaultTeamId         String? // Optional default team for attribution
+  // Restrictions
+  allowedModels         Json? // Array of allowed model identifiers (string[])
+  blockedModels         Json? // Array of blocked model identifiers (string[])
+  requireAttribution    Boolean? // Nullable: inherit org policy; true = require appId
+  // Limits
+  rateLimitRpm          Int? // Rate limit per minute (null = unlimited)
+  dailyCostLimitEur     Decimal?            @db.Decimal(12, 4) // Daily spend cap in EUR
+  monthlyCostLimitEur   Decimal?            @db.Decimal(12, 4) // Monthly spend cap in EUR
+  // Observability
+  lastUsedAt            DateTime? // Last time this key was used
+  expiresAt             DateTime? // Optional expiration date
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  revokedAt             DateTime?
+  organization          Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  defaultApp            App?                @relation(fields: [defaultAppId], references: [id], onDelete: SetNull)
+  defaultProject        Project?            @relation(fields: [defaultProjectId], references: [id], onDelete: SetNull)
+  defaultClient         Client?             @relation(fields: [defaultClientId], references: [id], onDelete: SetNull)
+  defaultTeam           Team?               @relation(fields: [defaultTeamId], references: [id], onDelete: SetNull)
+  usageWindows          ApiKeyUsageWindow[]
+  auditLogs             ApiKeyAudit[]
 
   @@index([orgId])
   @@index([keyHash])
   @@index([orgId, status])
   @@index([enabled])
+  @@index([keyPrefix])
+  @@index([lastUsedAt])
 }
 
 // AI Gateway Policies
@@ -409,6 +428,7 @@ model Team {
   memberships   Membership[]
   costEvents    CostEvent[]
   aiRequestLogs AiRequestLog[]
+  aiGatewayKeys AiGatewayKey[] // Keys with this as defaultTeam
 
   @@index([orgId])
   @@index([orgId, name])
