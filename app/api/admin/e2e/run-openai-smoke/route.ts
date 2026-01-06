@@ -45,7 +45,6 @@ async function createTestApiKey(orgId: string, userId: string): Promise<{ key: s
       keyHash,
       status: 'active',
       enabled: true,
-      label: 'e2e-test-temporary',
     },
   })
 
