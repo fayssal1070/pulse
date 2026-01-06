@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
       defaultAppId: key.defaultAppId,
       defaultProjectId: key.defaultProjectId,
       defaultClientId: key.defaultClientId,
+      defaultTeamId: key.defaultTeamId,
     })
 
     // Convert input to messages format (for chat/completions)
