@@ -191,9 +191,10 @@ export async function POST(request: NextRequest) {
       messages,
       maxTokens: max_tokens,
       temperature,
+      apiKeyId: authResult.apiKeyId,
+      apiKeyLabel: authResult.apiKeyLabel,
       metadata: {
         source: 'openai-compat-v1',
-        apiKeyId: key.id,
       },
     })
 
