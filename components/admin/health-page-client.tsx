@@ -45,6 +45,13 @@ interface HealthData {
       error: string | null
       meta: any
     } | null
+    RETRY_NOTIFICATIONS: {
+      status: string
+      startedAt: string
+      finishedAt: string | null
+      error: string | null
+      meta: any
+    } | null
   }
   recentErrors: Array<{
     type: string
@@ -52,6 +59,10 @@ interface HealthData {
     finishedAt: string | null
     error: string | null
   }>
+  notificationFailures?: {
+    byChannel: Record<string, number>
+    total: number
+  }
 }
 
 export default function HealthPageClient() {
@@ -270,8 +281,71 @@ export default function HealthPageClient() {
               <p className="text-sm text-gray-500">No runs recorded</p>
             )}
           </div>
+
+          {/* RETRY_NOTIFICATIONS */}
+          <div data-testid="health-cron-retry-notifications">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-medium text-gray-900">RETRY_NOTIFICATIONS</span>
+              {health.cron.RETRY_NOTIFICATIONS && (
+                <span
+                  className={`px-2 py-1 text-xs font-semibold rounded ${
+                    health.cron.RETRY_NOTIFICATIONS.status === 'SUCCESS'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}
+                >
+                  {health.cron.RETRY_NOTIFICATIONS.status}
+                </span>
+              )}
+            </div>
+            {health.cron.RETRY_NOTIFICATIONS ? (
+              <div className="text-sm text-gray-600 space-y-1">
+                <p>Last run: {formatDate(health.cron.RETRY_NOTIFICATIONS.startedAt)}</p>
+                {health.cron.RETRY_NOTIFICATIONS.finishedAt && (
+                  <p>Finished: {formatDate(health.cron.RETRY_NOTIFICATIONS.finishedAt)}</p>
+                )}
+                {health.cron.RETRY_NOTIFICATIONS.error && (
+                  <p className="text-red-600">Error: {health.cron.RETRY_NOTIFICATIONS.error}</p>
+                )}
+                {health.cron.RETRY_NOTIFICATIONS.meta && (
+                  <p className="text-xs text-gray-500">
+                    Processed: {health.cron.RETRY_NOTIFICATIONS.meta.total || 0} | 
+                    Success: {health.cron.RETRY_NOTIFICATIONS.meta.success || 0} | 
+                    Failed: {health.cron.RETRY_NOTIFICATIONS.meta.failed || 0}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No runs recorded</p>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Notification Delivery Failures */}
+      {health.notificationFailures && health.notificationFailures.total > 0 && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6" data-testid="health-notification-failures">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Notification Delivery Failures (Last 20)
+          </h3>
+          <div className="mb-2">
+            <p className="text-sm text-gray-600">
+              Total failed deliveries: <span className="font-semibold text-red-600">{health.notificationFailures.total}</span>
+            </p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {Object.entries(health.notificationFailures.byChannel).map(([channel, count]) => (
+              <div key={channel} className="p-3 bg-red-50 border border-red-200 rounded">
+                <p className="text-xs text-gray-500 uppercase">{channel}</p>
+                <p className="text-lg font-semibold text-red-600">{count}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-4">
+            View details in <a href="/admin/notifications" className="text-blue-600 underline">/admin/notifications</a>
+          </p>
+        </div>
+      )}
 
       {/* Recent Errors */}
       {health.recentErrors.length > 0 && (
