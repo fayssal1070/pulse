@@ -10,6 +10,7 @@ import { getActiveOrganization } from '@/lib/active-org'
 import { requireRole } from '@/lib/auth/rbac'
 import { prisma } from '@/lib/prisma'
 import { randomBytes, createHash } from 'crypto'
+import { Prisma } from '@prisma/client'
 
 export async function GET(request: NextRequest) {
   try {
@@ -145,8 +146,8 @@ export async function POST(request: NextRequest) {
           defaultProjectId: defaultProjectId || null,
           defaultClientId: defaultClientId || null,
           defaultTeamId: defaultTeamId || null,
-          allowedModels: allowedModels && Array.isArray(allowedModels) ? allowedModels : null,
-          blockedModels: blockedModels && Array.isArray(blockedModels) ? blockedModels : null,
+          allowedModels: allowedModels && Array.isArray(allowedModels) ? allowedModels : Prisma.JsonNull,
+          blockedModels: blockedModels && Array.isArray(blockedModels) ? blockedModels : Prisma.JsonNull,
           requireAttribution: requireAttribution !== undefined ? requireAttribution : null,
           rateLimitRpm: rateLimitRpm || null,
           dailyCostLimitEur: dailyCostLimitEur || null,
