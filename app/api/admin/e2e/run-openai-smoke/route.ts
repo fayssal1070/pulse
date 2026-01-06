@@ -433,12 +433,12 @@ async function testBudgetEnforcement(
     const tempBudget = await prisma.budget.create({
       data: {
         orgId,
-        appId: app.id,
-        type: 'APP',
-        limitEUR: 0.001, // Very low limit
+        name: 'E2E Test Budget',
+        scopeType: 'APP',
+        scopeId: app.id,
+        amountEur: 0.001, // Very low limit
         enabled: true,
         period: 'MONTHLY',
-        startDate: new Date(),
       },
     })
     tempBudgetId = tempBudget.id
