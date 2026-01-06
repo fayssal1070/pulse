@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateApiKey } from '@/lib/ai/api-key-auth'
+import { requireApiKeyAuth, checkModelRestrictions, checkCostLimits } from '@/lib/ai/api-key-auth'
 import { checkRateLimit } from '@/lib/ratelimit'
 import { callOpenAIEmbeddings } from '@/lib/ai/providers/openai-streaming'
 import { decryptSecret } from '@/lib/ai/providers/crypto'
@@ -16,17 +16,15 @@ import { createHash } from 'crypto'
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate API key
-    const authResult = await authenticateApiKey(request)
+    // Authenticate API key (unified helper)
+    const authResult = await requireApiKeyAuth(request)
     if (!authResult.success) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     }
 
-    const { key } = authResult.result
-
     // Check rate limit
-    if (key.rateLimitRpm !== null && key.rateLimitRpm > 0) {
-      const rateLimitResult = await checkRateLimit(key.id, key.rateLimitRpm)
+    if (authResult.limits.rateLimitRpm !== null && authResult.limits.rateLimitRpm > 0) {
+      const rateLimitResult = await checkRateLimit(authResult.apiKeyId, authResult.limits.rateLimitRpm)
       if (!rateLimitResult.allowed) {
         return NextResponse.json(
           {
@@ -41,7 +39,7 @@ export async function POST(request: NextRequest) {
             status: 429,
             headers: {
               'Retry-After': '60',
-              'X-RateLimit-Limit': key.rateLimitRpm.toString(),
+              'X-RateLimit-Limit': authResult.limits.rateLimitRpm.toString(),
               'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
               'X-RateLimit-Reset': Math.floor(rateLimitResult.resetAt.getTime() / 1000).toString(),
             },
@@ -53,6 +51,49 @@ export async function POST(request: NextRequest) {
     // Parse OpenAI request body
     const body = await request.json().catch(() => ({}))
     const { input, model = 'text-embedding-ada-002' } = body
+
+    // Check model restrictions
+    const modelCheck = checkModelRestrictions(
+      model,
+      authResult.restrictions.allowedModels,
+      authResult.restrictions.blockedModels
+    )
+    if (!modelCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: {
+            message: modelCheck.reason || 'Model not allowed',
+            type: 'invalid_request_error',
+            param: 'model',
+            code: 'model_restricted',
+          },
+        },
+        { status: 403 }
+      )
+    }
+
+    // Check cost limits
+    if (authResult.limits.dailyCostLimitEur || authResult.limits.monthlyCostLimitEur) {
+      const costCheck = await checkCostLimits(
+        authResult.apiKeyId,
+        authResult.orgId,
+        authResult.limits.dailyCostLimitEur,
+        authResult.limits.monthlyCostLimitEur
+      )
+      if (!costCheck.withinLimit) {
+        return NextResponse.json(
+          {
+            error: {
+              message: costCheck.reason || 'Cost limit exceeded',
+              type: 'insufficient_quota_error',
+              param: null,
+              code: 'cost_limit_exceeded',
+            },
+          },
+          { status: 403 }
+        )
+      }
+    }
 
     if (!input) {
       return NextResponse.json(
@@ -71,7 +112,7 @@ export async function POST(request: NextRequest) {
     // Find route and connection for embeddings
     const routes = await prisma.aiModelRoute.findMany({
       where: {
-        orgId: key.orgId,
+        orgId: authResult.orgId,
         model,
         enabled: true,
       },
@@ -112,7 +153,7 @@ export async function POST(request: NextRequest) {
 
     const connection = await prisma.aiProviderConnection.findFirst({
       where: {
-        orgId: key.orgId,
+        orgId: authResult.orgId,
         provider: route.provider,
         status: AiProviderConnectionStatus.ACTIVE,
       },
@@ -145,8 +186,10 @@ export async function POST(request: NextRequest) {
     prisma.aiRequestLog
       .create({
         data: {
-          orgId: key.orgId,
-          userId: key.createdByUserId,
+          orgId: authResult.orgId,
+          userId: authResult.createdByUserId,
+          apiKeyId: authResult.apiKeyId,
+          apiKeyLabelSnapshot: authResult.apiKeyLabel,
           provider: 'openai',
           model,
           promptHash: createHash('sha256')
@@ -166,7 +209,7 @@ export async function POST(request: NextRequest) {
     prisma.costEvent
       .create({
         data: {
-          orgId: key.orgId,
+          orgId: authResult.orgId,
           source: 'AI',
           occurredAt: new Date(),
           amountEur: estimatedCost,
@@ -178,8 +221,10 @@ export async function POST(request: NextRequest) {
           quantity: embeddingsResult.tokensIn,
           unit: 'TOKENS',
           costCategory: 'AI',
+          apiKeyId: authResult.apiKeyId,
+          apiKeyLabelSnapshot: authResult.apiKeyLabel,
           uniqueHash: createHash('sha256')
-            .update(`${key.orgId}|${requestId}|${embeddingsResult.tokensIn}`)
+            .update(`${authResult.orgId}|${requestId}|${embeddingsResult.tokensIn}`)
             .digest('hex'),
           rawRef: { requestId, type: 'embeddings' },
         },

@@ -127,12 +127,15 @@ export async function GET(request: Request) {
       neverUsed: 0,
       lastUsedOldest: null as string | null,
       lastUsedNewest: null as string | null,
+      top5BySpendMTD: [] as any[],
     }
     health.recentKeyAudits = [] as any[]
+    health.recentKeyFailures = [] as any[]
 
     // Get API keys stats
     try {
-      const [activeKeys, revokedKeys, keysWithoutUsage, oldestUsage, newestUsage] = await Promise.all([
+      const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      const [activeKeys, revokedKeys, keysWithoutUsage, oldestUsage, newestUsage, topKeysSpend] = await Promise.all([
         prisma.aiGatewayKey.count({ where: { status: 'active', enabled: true } }),
         prisma.aiGatewayKey.count({ where: { status: 'revoked' } }),
         prisma.aiGatewayKey.count({ where: { lastUsedAt: null } }),
@@ -146,6 +149,18 @@ export async function GET(request: Request) {
           orderBy: { lastUsedAt: 'desc' },
           select: { lastUsedAt: true },
         }),
+        // Top 5 keys by MTD spend
+        prisma.costEvent.groupBy({
+          by: ['apiKeyId'],
+          where: {
+            apiKeyId: { not: null },
+            source: 'AI',
+            occurredAt: { gte: startOfMonth },
+          },
+          _sum: { amountEur: true },
+          orderBy: { _sum: { amountEur: 'desc' } },
+          take: 5,
+        }),
       ])
 
       health.apiKeys.active = activeKeys
@@ -153,6 +168,27 @@ export async function GET(request: Request) {
       health.apiKeys.neverUsed = keysWithoutUsage
       health.apiKeys.lastUsedOldest = oldestUsage?.lastUsedAt?.toISOString() || null
       health.apiKeys.lastUsedNewest = newestUsage?.lastUsedAt?.toISOString() || null
+
+      // Resolve key labels for top spenders
+      const topKeyIds = topKeysSpend.filter((k) => k.apiKeyId).map((k) => k.apiKeyId!)
+      if (topKeyIds.length > 0) {
+        const keys = await prisma.aiGatewayKey.findMany({
+          where: { id: { in: topKeyIds } },
+          select: { id: true, label: true, keyPrefix: true },
+        })
+        const keysMap = new Map(keys.map((k) => [k.id, k]))
+        health.apiKeys.top5BySpendMTD = topKeysSpend
+          .filter((k) => k.apiKeyId)
+          .map((k) => {
+            const key = keysMap.get(k.apiKeyId!)
+            return {
+              apiKeyId: k.apiKeyId,
+              label: key?.label || 'Unnamed',
+              prefix: key?.keyPrefix || 'unknown',
+              spendMTD: k._sum.amountEur ? parseFloat(k._sum.amountEur.toString()) : 0,
+            }
+          })
+      }
 
       // Get recent key audits (last 20)
       const recentAudits = await prisma.apiKeyAudit.findMany({
@@ -175,6 +211,34 @@ export async function GET(request: Request) {
         action: audit.action,
         createdAt: audit.createdAt.toISOString(),
         meta: audit.metaJson ? JSON.parse(audit.metaJson) : null,
+      }))
+
+      // Get recent key failures (last 10 auth/limit blocks)
+      const recentFailures = await prisma.aiRequestLog.findMany({
+        where: {
+          statusCode: { in: [401, 403, 429] },
+          occurredAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }, // Last 7 days
+        },
+        orderBy: { occurredAt: 'desc' },
+        take: 10,
+        select: {
+          id: true,
+          apiKeyId: true,
+          statusCode: true,
+          occurredAt: true,
+          rawRef: true,
+        },
+      })
+
+      health.recentKeyFailures = recentFailures.map((f) => ({
+        id: f.id,
+        apiKeyId: f.apiKeyId || null,
+        statusCode: f.statusCode,
+        occurredAt: f.occurredAt.toISOString(),
+        reason:
+          f.rawRef && typeof f.rawRef === 'object' && 'reason' in f.rawRef
+            ? String(f.rawRef.reason)
+            : `HTTP ${f.statusCode}`,
       }))
     } catch (error: any) {
       // Ignore errors

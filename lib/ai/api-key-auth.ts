@@ -11,6 +11,7 @@ export interface ApiKeyAuthResult {
     id: string
     orgId: string
     createdByUserId: string
+    label: string | null
     defaultAppId: string | null
     defaultProjectId: string | null
     defaultClientId: string | null
@@ -68,6 +69,7 @@ export async function authenticateApiKey(
       id: true,
       orgId: true,
       createdByUserId: true,
+      label: true,
       defaultAppId: true,
       defaultProjectId: true,
       defaultClientId: true,
@@ -116,6 +118,7 @@ export async function authenticateApiKey(
         id: key.id,
         orgId: key.orgId,
         createdByUserId: key.createdByUserId,
+        label: key.label,
         defaultAppId: key.defaultAppId,
         defaultProjectId: key.defaultProjectId,
         defaultClientId: key.defaultClientId,
@@ -202,7 +205,7 @@ export function checkModelRestrictions(
 }
 
 /**
- * Check daily/monthly cost limits
+ * Check daily/monthly cost limits (filtered by apiKeyId)
  */
 export async function checkCostLimits(
   keyId: string,
@@ -218,15 +221,13 @@ export async function checkCostLimits(
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-  // Aggregate costs from CostEvent for this key's org (using AiRequestLog to link to key)
-  // For simplicity, we'll check all AI costs for the org in the period
-  // In production, you might want to track per-key costs separately
-
+  // Aggregate costs from CostEvent filtered by apiKeyId
   if (dailyLimitEur) {
     const dailyCost = await prisma.costEvent.aggregate({
       where: {
         orgId,
         provider: 'AI',
+        apiKeyId: keyId,
         occurredAt: { gte: startOfDay },
       },
       _sum: {
@@ -244,6 +245,7 @@ export async function checkCostLimits(
       where: {
         orgId,
         provider: 'AI',
+        apiKeyId: keyId,
         occurredAt: { gte: startOfMonth },
       },
       _sum: {
@@ -257,5 +259,70 @@ export async function checkCostLimits(
   }
 
   return { withinLimit: true }
+}
+
+/**
+ * Unified API key authentication and enforcement helper
+ * Use this in all endpoints for consistent behavior
+ */
+export async function requireApiKeyAuth(
+  request: NextRequest
+): Promise<{
+  success: true
+  orgId: string
+  createdByUserId: string
+  apiKeyId: string
+  apiKeyLabel: string | null
+  defaults: {
+    defaultAppId: string | null
+    defaultProjectId: string | null
+    defaultClientId: string | null
+    defaultTeamId: string | null
+  }
+  restrictions: {
+    allowedModels: string[] | null
+    blockedModels: string[] | null
+    requireAttribution: boolean | null
+  }
+  limits: {
+    rateLimitRpm: number | null
+    dailyCostLimitEur: number | null
+    monthlyCostLimitEur: number | null
+  }
+} | {
+  success: false
+  error: string
+  status: number
+}> {
+  const authResult = await authenticateApiKey(request)
+  if (!authResult.success) {
+    return authResult
+  }
+
+  const key = authResult.result.key
+
+  return {
+    success: true,
+    orgId: key.orgId,
+    createdByUserId: key.createdByUserId,
+    apiKeyId: key.id,
+    apiKeyLabel: key.label || null,
+    defaults: {
+      defaultAppId: key.defaultAppId,
+      defaultProjectId: key.defaultProjectId,
+      defaultClientId: key.defaultClientId,
+      defaultTeamId: key.defaultTeamId,
+    },
+    restrictions: {
+      allowedModels: key.allowedModels,
+      blockedModels: key.blockedModels,
+      requireAttribution: key.requireAttribution,
+    },
+    limits: {
+      rateLimitRpm: key.rateLimitRpm,
+      dailyCostLimitEur: key.dailyCostLimitEur,
+      monthlyCostLimitEur: key.monthlyCostLimitEur,
+    },
+  }
 }
 

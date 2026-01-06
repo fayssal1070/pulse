@@ -17,6 +17,8 @@ export interface AiRequestInput {
   projectId?: string
   appId?: string
   clientId?: string
+  apiKeyId?: string
+  apiKeyLabel?: string | null
   model: string
   messages?: Array<{ role: string; content: string }>
   prompt?: string
@@ -303,6 +305,8 @@ export async function processAiRequest(
           projectId: input.projectId,
           appId: input.appId,
           clientId: input.clientId,
+          apiKeyId: input.apiKeyId || null,
+          apiKeyLabelSnapshot: input.apiKeyLabel || null,
           provider: getProviderFromModel(input.model),
           model: input.model,
           promptHash: hashPrompt(messages.map((m) => m.content).join('\n')),
@@ -342,6 +346,8 @@ export async function processAiRequest(
           projectId: input.projectId,
           appId: input.appId,
           clientId: input.clientId,
+          apiKeyId: input.apiKeyId || null,
+          apiKeyLabelSnapshot: input.apiKeyLabel || null,
           provider: getProviderFromModel(input.model),
           model: input.model,
           promptHash: hashPrompt(messages.map((m) => m.content).join('\n')),
@@ -389,6 +395,8 @@ export async function processAiRequest(
         projectId: input.projectId,
         appId: input.appId,
         clientId: input.clientId,
+        apiKeyId: input.apiKeyId || null,
+        apiKeyLabelSnapshot: input.apiKeyLabel || null,
         provider,
         model: input.model,
         promptHash: hashPrompt(messages.map((m) => m.content).join('\n')),
@@ -440,6 +448,8 @@ export async function processAiRequest(
         projectId: input.projectId || null,
         appId: input.appId || null,
         clientId: input.clientId || null,
+        apiKeyId: input.apiKeyId || null,
+        apiKeyLabelSnapshot: input.apiKeyLabel || null,
         rawRef: {
           requestId: apiResponse.requestId,
           inputTokens: apiResponse.inputTokens,
@@ -503,6 +513,8 @@ export async function processAiRequest(
         projectId: input.projectId,
         appId: input.appId,
         clientId: input.clientId,
+        apiKeyId: input.apiKeyId || null,
+        apiKeyLabelSnapshot: input.apiKeyLabel || null,
         provider: getProviderFromModel(input.model),
         model: input.model,
         promptHash: hashPrompt(

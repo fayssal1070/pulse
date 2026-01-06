@@ -5,23 +5,21 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateApiKey } from '@/lib/ai/api-key-auth'
+import { requireApiKeyAuth } from '@/lib/ai/api-key-auth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate API key
-    const authResult = await authenticateApiKey(request)
+    // Authenticate API key (unified helper)
+    const authResult = await requireApiKeyAuth(request)
     if (!authResult.success) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     }
 
-    const { key } = authResult.result
-
     // Get enabled model routes for the organization
     const routes = await prisma.aiModelRoute.findMany({
       where: {
-        orgId: key.orgId,
+        orgId: authResult.orgId,
         enabled: true,
       },
       select: {

@@ -18,7 +18,9 @@ export async function createStreamingResponse(
   teamId?: string,
   projectId?: string,
   appId?: string,
-  clientId?: string
+  clientId?: string,
+  apiKeyId?: string,
+  apiKeyLabel?: string | null
 ): Promise<ReadableStream> {
   // Find route and connection (same logic as router)
   const routes = await prisma.aiModelRoute.findMany({
@@ -66,6 +68,8 @@ export async function createStreamingResponse(
       projectId,
       appId,
       clientId,
+      apiKeyId,
+      apiKeyLabel,
       model,
       messages,
       maxTokens,
@@ -139,6 +143,8 @@ export async function createStreamingResponse(
           projectId,
           appId,
           clientId,
+          apiKeyId,
+          apiKeyLabel,
           model,
           messages,
           maxTokens,

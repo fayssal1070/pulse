@@ -65,6 +65,12 @@ interface HealthData {
     neverUsed: number
     lastUsedOldest: string | null
     lastUsedNewest: string | null
+    top5BySpendMTD?: Array<{
+      apiKeyId: string
+      label: string
+      prefix: string
+      spendMTD: number
+    }>
   }
   recentKeyAudits?: Array<{
     id: string
@@ -73,6 +79,13 @@ interface HealthData {
     action: string
     createdAt: string
     meta: any
+  }>
+  recentKeyFailures?: Array<{
+    id: string
+    apiKeyId: string | null
+    statusCode: number
+    occurredAt: string
+    reason: string
   }>
   notificationFailures?: {
     byChannel: Record<string, number>

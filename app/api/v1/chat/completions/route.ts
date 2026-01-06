@@ -4,23 +4,21 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateApiKey, resolveAttribution, checkModelRestrictions, checkCostLimits } from '@/lib/ai/api-key-auth'
+import { requireApiKeyAuth, resolveAttribution, checkModelRestrictions, checkCostLimits } from '@/lib/ai/api-key-auth'
 import { checkRateLimit } from '@/lib/ratelimit'
 import { processAiRequest } from '@/lib/ai/gateway'
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate API key
-    const authResult = await authenticateApiKey(request)
+    // Authenticate API key (unified helper)
+    const authResult = await requireApiKeyAuth(request)
     if (!authResult.success) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     }
 
-    const { key } = authResult.result
-
     // Check rate limit
-    if (key.rateLimitRpm !== null && key.rateLimitRpm > 0) {
-      const rateLimitResult = await checkRateLimit(key.id, key.rateLimitRpm)
+    if (authResult.limits.rateLimitRpm !== null && authResult.limits.rateLimitRpm > 0) {
+      const rateLimitResult = await checkRateLimit(authResult.apiKeyId, authResult.limits.rateLimitRpm)
       if (!rateLimitResult.allowed) {
         return NextResponse.json(
           {
@@ -35,7 +33,7 @@ export async function POST(request: NextRequest) {
             status: 429,
             headers: {
               'Retry-After': '60',
-              'X-RateLimit-Limit': key.rateLimitRpm.toString(),
+              'X-RateLimit-Limit': authResult.limits.rateLimitRpm.toString(),
               'X-RateLimit-Remaining': Math.max(0, rateLimitResult.remaining).toString(),
               'X-RateLimit-Reset': Math.floor(rateLimitResult.resetAt.getTime() / 1000).toString(),
             },
@@ -50,7 +48,11 @@ export async function POST(request: NextRequest) {
 
     // Check model restrictions (allowed/blocked)
     if (model) {
-      const modelCheck = checkModelRestrictions(model, key.allowedModels, key.blockedModels)
+      const modelCheck = checkModelRestrictions(
+        model,
+        authResult.restrictions.allowedModels,
+        authResult.restrictions.blockedModels
+      )
       if (!modelCheck.allowed) {
         return NextResponse.json(
           {
@@ -67,8 +69,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Check cost limits (daily/monthly)
-    if (key.dailyCostLimitEur || key.monthlyCostLimitEur) {
-      const costCheck = await checkCostLimits(key.id, key.orgId, key.dailyCostLimitEur, key.monthlyCostLimitEur)
+    if (authResult.limits.dailyCostLimitEur || authResult.limits.monthlyCostLimitEur) {
+      const costCheck = await checkCostLimits(
+        authResult.apiKeyId,
+        authResult.orgId,
+        authResult.limits.dailyCostLimitEur,
+        authResult.limits.monthlyCostLimitEur
+      )
       if (!costCheck.withinLimit) {
         return NextResponse.json(
           {
@@ -113,23 +120,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Resolve attribution from headers or key defaults
-    const attribution = resolveAttribution(request, {
-      defaultAppId: key.defaultAppId,
-      defaultProjectId: key.defaultProjectId,
-      defaultClientId: key.defaultClientId,
-      defaultTeamId: key.defaultTeamId,
-    })
+    const attribution = resolveAttribution(request, authResult.defaults)
 
     // Check requireAttribution policy (key-level override or org policy)
-    const keyRequiresAttribution = key.requireAttribution !== null ? key.requireAttribution : null
-    let requiresAttribution = keyRequiresAttribution
-
+    let requiresAttribution = authResult.restrictions.requireAttribution
     if (requiresAttribution === null) {
       // Fallback to org policy if key doesn't specify
       const { prisma } = await import('@/lib/prisma')
       const policies = await prisma.aiPolicy.findMany({
         where: {
-          orgId: key.orgId,
+          orgId: authResult.orgId,
           enabled: true,
         },
       })
@@ -154,8 +154,8 @@ export async function POST(request: NextRequest) {
     if (stream === true) {
       const { createStreamingResponse } = await import('../completions-stream')
       const streamResponse = await createStreamingResponse(
-        key.orgId,
-        key.createdByUserId,
+        authResult.orgId,
+        authResult.createdByUserId,
         model,
         messages,
         max_tokens,
@@ -163,7 +163,9 @@ export async function POST(request: NextRequest) {
         attribution.teamId || request.headers.get('x-pulse-team') || undefined,
         attribution.projectId,
         attribution.appId,
-        attribution.clientId
+        attribution.clientId,
+        authResult.apiKeyId,
+        authResult.apiKeyLabel
       )
 
       return new Response(streamResponse, {
@@ -177,12 +179,14 @@ export async function POST(request: NextRequest) {
 
     // Process non-streaming request through gateway
     const gatewayResponse = await processAiRequest({
-      orgId: key.orgId,
-      userId: key.createdByUserId, // Use key creator as userId
+      orgId: authResult.orgId,
+      userId: authResult.createdByUserId, // Use key creator as userId
       teamId: attribution.teamId || request.headers.get('x-pulse-team') || undefined,
       projectId: attribution.projectId,
       appId: attribution.appId,
       clientId: attribution.clientId,
+      apiKeyId: authResult.apiKeyId,
+      apiKeyLabel: authResult.apiKeyLabel,
       model,
       messages,
       maxTokens: max_tokens,

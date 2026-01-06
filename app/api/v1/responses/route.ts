@@ -5,23 +5,21 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateApiKey, resolveAttribution } from '@/lib/ai/api-key-auth'
+import { requireApiKeyAuth, resolveAttribution, checkModelRestrictions, checkCostLimits } from '@/lib/ai/api-key-auth'
 import { checkRateLimit } from '@/lib/ratelimit'
 import { processAiRequest } from '@/lib/ai/gateway'
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate API key
-    const authResult = await authenticateApiKey(request)
+    // Authenticate API key (unified helper)
+    const authResult = await requireApiKeyAuth(request)
     if (!authResult.success) {
       return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     }
 
-    const { key } = authResult.result
-
     // Check rate limit
-    if (key.rateLimitRpm !== null && key.rateLimitRpm > 0) {
-      const rateLimitResult = await checkRateLimit(key.id, key.rateLimitRpm)
+    if (authResult.limits.rateLimitRpm !== null && authResult.limits.rateLimitRpm > 0) {
+      const rateLimitResult = await checkRateLimit(authResult.apiKeyId, authResult.limits.rateLimitRpm)
       if (!rateLimitResult.allowed) {
         return NextResponse.json(
           {
@@ -40,6 +38,51 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
     const { input, model = 'gpt-4', stream } = body
 
+    // Check model restrictions
+    if (model) {
+      const modelCheck = checkModelRestrictions(
+        model,
+        authResult.restrictions.allowedModels,
+        authResult.restrictions.blockedModels
+      )
+      if (!modelCheck.allowed) {
+        return NextResponse.json(
+          {
+            error: {
+              message: modelCheck.reason || 'Model not allowed',
+              type: 'invalid_request_error',
+              param: 'model',
+              code: 'model_restricted',
+            },
+          },
+          { status: 403 }
+        )
+      }
+    }
+
+    // Check cost limits
+    if (authResult.limits.dailyCostLimitEur || authResult.limits.monthlyCostLimitEur) {
+      const costCheck = await checkCostLimits(
+        authResult.apiKeyId,
+        authResult.orgId,
+        authResult.limits.dailyCostLimitEur,
+        authResult.limits.monthlyCostLimitEur
+      )
+      if (!costCheck.withinLimit) {
+        return NextResponse.json(
+          {
+            error: {
+              message: costCheck.reason || 'Cost limit exceeded',
+              type: 'insufficient_quota_error',
+              param: null,
+              code: 'cost_limit_exceeded',
+            },
+          },
+          { status: 403 }
+        )
+      }
+    }
+
     if (!input) {
       return NextResponse.json(
         {
@@ -55,12 +98,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Resolve attribution
-    const attribution = resolveAttribution(request, {
-      defaultAppId: key.defaultAppId,
-      defaultProjectId: key.defaultProjectId,
-      defaultClientId: key.defaultClientId,
-      defaultTeamId: key.defaultTeamId,
-    })
+    const attribution = resolveAttribution(request, authResult.defaults)
 
     // Convert input to messages format (for chat/completions)
     const messages = Array.isArray(input)
@@ -71,16 +109,18 @@ export async function POST(request: NextRequest) {
     if (stream === true) {
       const { createStreamingResponse } = await import('../chat/completions-stream')
       const streamResponse = await createStreamingResponse(
-        key.orgId,
-        key.createdByUserId,
+        authResult.orgId,
+        authResult.createdByUserId,
         model,
         messages,
         undefined,
         undefined,
-        request.headers.get('x-pulse-team') || undefined,
+        attribution.teamId || request.headers.get('x-pulse-team') || undefined,
         attribution.projectId,
         attribution.appId,
-        attribution.clientId
+        attribution.clientId,
+        authResult.apiKeyId,
+        authResult.apiKeyLabel
       )
 
       return new Response(streamResponse, {
@@ -94,17 +134,18 @@ export async function POST(request: NextRequest) {
 
     // Process through gateway (same as chat/completions)
     const gatewayResponse = await processAiRequest({
-      orgId: key.orgId,
-      userId: key.createdByUserId,
-      teamId: request.headers.get('x-pulse-team') || undefined,
+      orgId: authResult.orgId,
+      userId: authResult.createdByUserId,
+      teamId: attribution.teamId || request.headers.get('x-pulse-team') || undefined,
       projectId: attribution.projectId,
       appId: attribution.appId,
       clientId: attribution.clientId,
+      apiKeyId: authResult.apiKeyId,
+      apiKeyLabel: authResult.apiKeyLabel,
       model,
       messages,
       metadata: {
         source: 'openai-compat-v1-responses',
-        apiKeyId: key.id,
       },
     })
 
