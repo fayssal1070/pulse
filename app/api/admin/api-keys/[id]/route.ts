@@ -9,6 +9,7 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { getActiveOrganization } from '@/lib/active-org'
 import { requireRole } from '@/lib/auth/rbac'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 export async function PATCH(
   request: NextRequest,
@@ -81,8 +82,8 @@ export async function PATCH(
           defaultProjectId: defaultProjectId !== undefined ? defaultProjectId : undefined,
           defaultClientId: defaultClientId !== undefined ? defaultClientId : undefined,
           defaultTeamId: defaultTeamId !== undefined ? defaultTeamId : undefined,
-          allowedModels: allowedModels !== undefined ? (Array.isArray(allowedModels) ? allowedModels : null) : undefined,
-          blockedModels: blockedModels !== undefined ? (Array.isArray(blockedModels) ? blockedModels : null) : undefined,
+          allowedModels: allowedModels !== undefined ? (Array.isArray(allowedModels) ? allowedModels : Prisma.JsonNull) : undefined,
+          blockedModels: blockedModels !== undefined ? (Array.isArray(blockedModels) ? blockedModels : Prisma.JsonNull) : undefined,
           requireAttribution: requireAttribution !== undefined ? requireAttribution : undefined,
           rateLimitRpm: rateLimitRpm !== undefined ? rateLimitRpm : undefined,
           dailyCostLimitEur: dailyCostLimitEur !== undefined ? dailyCostLimitEur : undefined,
