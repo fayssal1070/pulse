@@ -333,12 +333,12 @@ async function testLogging(orgId: string, startTime: Date): Promise<TestResult> 
       prisma.aiRequestLog.findMany({
         where: {
           orgId,
-          createdAt: {
+          occurredAt: {
             gte: startTime,
           },
         },
         take: 10,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { occurredAt: 'desc' },
       }),
       prisma.costEvent.findMany({
         where: {
