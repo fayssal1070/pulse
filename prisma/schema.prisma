@@ -647,6 +647,24 @@ model ApiKeyUsageWindow {
   @@index([windowStart])
 }
 
+// API Key Audit Trail
+model ApiKeyAudit {
+  id          String       @id @default(cuid())
+  orgId       String
+  apiKeyId    String
+  actorUserId String // User who performed the action
+  action      String // "CREATE" | "ROTATE" | "REVOKE" | "UPDATE"
+  metaJson    String? // JSON metadata (stored as text)
+  createdAt   DateTime     @default(now())
+  apiKey      AiGatewayKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([apiKeyId])
+  @@index([createdAt])
+  @@index([action])
+}
+
 // Organization webhooks for events (cost_event, alert_event, ai_request)
 model OrgWebhook {
   id           String       @id @default(cuid())
