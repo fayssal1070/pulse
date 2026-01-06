@@ -471,6 +471,8 @@ model NotificationPreference {
   emailEnabled    Boolean      @default(true)
   telegramEnabled Boolean      @default(false)
   telegramChatId  String?
+  slackEnabled    Boolean      @default(false)
+  teamsEnabled    Boolean      @default(false)
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -481,17 +483,42 @@ model NotificationPreference {
   @@index([userId])
 }
 
-// Organization integrations (Telegram bot token, etc.)
+// Organization integrations (Telegram bot token, Slack, Teams, etc.)
 model OrgIntegration {
   id                    String       @id @default(cuid())
   orgId                 String       @unique
   telegramBotTokenEnc   String? // Encrypted bot token
   telegramBotTokenLast4 String? // Last 4 chars for display
+  slackWebhookUrlEnc    String? // Encrypted Slack webhook URL
+  slackWebhookUrlLast4  String? // Last 4 chars for display
+  teamsWebhookUrlEnc    String? // Encrypted Teams webhook URL
+  teamsWebhookUrlLast4  String? // Last 4 chars for display
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
   organization          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([orgId])
+}
+
+// Notification delivery tracking with retry support
+model NotificationDelivery {
+  id            String    @id @default(cuid())
+  orgId         String
+  notificationId String?  // Optional reference to notification/alert ID
+  channel       String    // "EMAIL" | "TELEGRAM" | "INAPP" | "SLACK" | "TEAMS" | "WEBHOOK"
+  status        String    @default("PENDING") // "PENDING" | "SENT" | "FAILED" | "RETRYING"
+  attempt       Int       @default(1)
+  lastError     String?
+  nextRetryAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  organization  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, status])
+  @@index([nextRetryAt])
+  @@index([channel])
+  @@index([orgId])
+  @@index([status, nextRetryAt])
 }
 
 // AI Provider Connections (OpenAI, Anthropic, xAI, Google, Mistral)
