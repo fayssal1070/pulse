@@ -120,6 +120,66 @@ export async function GET(request: Request) {
       // Ignore errors
     }
 
+    // Initialize API keys stats
+    health.apiKeys = {
+      active: 0,
+      revoked: 0,
+      neverUsed: 0,
+      lastUsedOldest: null as string | null,
+      lastUsedNewest: null as string | null,
+    }
+    health.recentKeyAudits = [] as any[]
+
+    // Get API keys stats
+    try {
+      const [activeKeys, revokedKeys, keysWithoutUsage, oldestUsage, newestUsage] = await Promise.all([
+        prisma.aiGatewayKey.count({ where: { status: 'active', enabled: true } }),
+        prisma.aiGatewayKey.count({ where: { status: 'revoked' } }),
+        prisma.aiGatewayKey.count({ where: { lastUsedAt: null } }),
+        prisma.aiGatewayKey.findFirst({
+          where: { lastUsedAt: { not: null } },
+          orderBy: { lastUsedAt: 'asc' },
+          select: { lastUsedAt: true },
+        }),
+        prisma.aiGatewayKey.findFirst({
+          where: { lastUsedAt: { not: null } },
+          orderBy: { lastUsedAt: 'desc' },
+          select: { lastUsedAt: true },
+        }),
+      ])
+
+      health.apiKeys.active = activeKeys
+      health.apiKeys.revoked = revokedKeys
+      health.apiKeys.neverUsed = keysWithoutUsage
+      health.apiKeys.lastUsedOldest = oldestUsage?.lastUsedAt?.toISOString() || null
+      health.apiKeys.lastUsedNewest = newestUsage?.lastUsedAt?.toISOString() || null
+
+      // Get recent key audits (last 20)
+      const recentAudits = await prisma.apiKeyAudit.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          apiKeyId: true,
+          actorUserId: true,
+          action: true,
+          createdAt: true,
+          metaJson: true,
+        },
+      })
+
+      health.recentKeyAudits = recentAudits.map((audit) => ({
+        id: audit.id,
+        apiKeyId: audit.apiKeyId,
+        actorUserId: audit.actorUserId,
+        action: audit.action,
+        createdAt: audit.createdAt.toISOString(),
+        meta: audit.metaJson ? JSON.parse(audit.metaJson) : null,
+      }))
+    } catch (error: any) {
+      // Ignore errors
+    }
+
     // Get last run per cron type
     try {
       const cronTypes = ['RUN_ALERTS', 'APPLY_RETENTION', 'SYNC_AWS_CUR', 'RETRY_NOTIFICATIONS']
