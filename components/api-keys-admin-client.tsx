@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { format } from 'date-fns'
 import { Copy, Check, Plus, RotateCcw, Trash2, Edit2 } from 'lucide-react'
 import { Toast, useToast } from '@/components/toast'
 
@@ -318,7 +317,7 @@ export default function ApiKeysAdminClient({ organizationId, canRotateAny, direc
                     {key.defaultApp?.name || key.defaultProject?.name || key.defaultTeam?.name || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {key.lastUsedAt ? format(new Date(key.lastUsedAt), 'MMM d, yyyy HH:mm') : 'Never'}
+                    {key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                     {key.status === 'active' && (
