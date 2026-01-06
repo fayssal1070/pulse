@@ -63,6 +63,7 @@ model Organization {
   aiModelRoutes           AiModelRoute[]
   webhooks                OrgWebhook[]
   webhookDeliveries       OrgWebhookDelivery[]
+  notificationDeliveries  NotificationDelivery[]
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
