@@ -8,6 +8,13 @@ interface NotificationPreference {
   emailEnabled: boolean
   telegramEnabled: boolean
   telegramChatId: string | null
+  slackEnabled?: boolean
+  teamsEnabled?: boolean
+  integrations?: {
+    slackAvailable: boolean
+    teamsAvailable: boolean
+    telegramAvailable: boolean
+  }
 }
 
 export default function NotificationSettingsClient() {
@@ -15,11 +22,20 @@ export default function NotificationSettingsClient() {
   const [saving, setSaving] = useState(false)
   const [testingEmail, setTestingEmail] = useState(false)
   const [testingTelegram, setTestingTelegram] = useState(false)
+  const [testingSlack, setTestingSlack] = useState(false)
+  const [testingTeams, setTestingTeams] = useState(false)
   const [testingAlert, setTestingAlert] = useState(false)
   const [prefs, setPrefs] = useState<NotificationPreference | null>(null)
   const [emailEnabled, setEmailEnabled] = useState(true)
   const [telegramEnabled, setTelegramEnabled] = useState(false)
   const [telegramChatId, setTelegramChatId] = useState('')
+  const [slackEnabled, setSlackEnabled] = useState(false)
+  const [teamsEnabled, setTeamsEnabled] = useState(false)
+  const [integrations, setIntegrations] = useState<{
+    slackAvailable: boolean
+    teamsAvailable: boolean
+    telegramAvailable: boolean
+  } | null>(null)
   const { toast, showToast, hideToast } = useToast()
 
   useEffect(() => {
@@ -34,6 +50,11 @@ export default function NotificationSettingsClient() {
         setEmailEnabled(data.emailEnabled)
         setTelegramEnabled(data.telegramEnabled)
         setTelegramChatId(data.telegramChatId || '')
+        setSlackEnabled(data.slackEnabled || false)
+        setTeamsEnabled(data.teamsEnabled || false)
+        if (data.integrations) {
+          setIntegrations(data.integrations)
+        }
       })
       .catch((error) => {
         console.error('Error loading preferences:', error)
@@ -58,6 +79,8 @@ export default function NotificationSettingsClient() {
           emailEnabled,
           telegramEnabled,
           telegramChatId: telegramEnabled ? telegramChatId.trim() : null,
+          slackEnabled,
+          teamsEnabled,
         }),
       })
 
@@ -117,6 +140,52 @@ export default function NotificationSettingsClient() {
       showToast(`Error: ${error.message}`, 'error')
     } finally {
       setTestingTelegram(false)
+    }
+  }
+
+  const handleTestSlack = async () => {
+    setTestingSlack(true)
+    try {
+      const response = await fetch('/api/admin/integrations/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test', channel: 'slack' }),
+      })
+
+      const data = await response.json()
+      if (data.error) {
+        showToast(`Error: ${data.error}`, 'error')
+      } else {
+        showToast('Test Slack message sent successfully! Check your Slack channel.', 'success')
+      }
+    } catch (error: any) {
+      console.error('Error sending test Slack:', error)
+      showToast(`Error: ${error.message}`, 'error')
+    } finally {
+      setTestingSlack(false)
+    }
+  }
+
+  const handleTestTeams = async () => {
+    setTestingTeams(true)
+    try {
+      const response = await fetch('/api/admin/integrations/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test', channel: 'teams' }),
+      })
+
+      const data = await response.json()
+      if (data.error) {
+        showToast(`Error: ${data.error}`, 'error')
+      } else {
+        showToast('Test Teams message sent successfully! Check your Teams channel.', 'success')
+      }
+    } catch (error: any) {
+      console.error('Error sending test Teams:', error)
+      showToast(`Error: ${error.message}`, 'error')
+    } finally {
+      setTestingTeams(false)
     }
   }
 
@@ -253,6 +322,90 @@ export default function NotificationSettingsClient() {
                 </div>
               )}
             </div>
+
+            {/* Slack Notifications */}
+            {integrations?.slackAvailable && (
+              <div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Slack Notifications</h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Receive alert notifications via Slack
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={slackEnabled}
+                      onChange={(e) => setSlackEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+                <div className="mt-4">
+                  <button
+                    onClick={handleTestSlack}
+                    disabled={testingSlack}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    {testingSlack ? 'Sending...' : 'Send test Slack'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Teams Notifications */}
+            {integrations?.teamsAvailable && (
+              <div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Microsoft Teams Notifications</h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Receive alert notifications via Microsoft Teams
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={teamsEnabled}
+                      onChange={(e) => setTeamsEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+                <div className="mt-4">
+                  <button
+                    onClick={handleTestTeams}
+                    disabled={testingTeams}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    {testingTeams ? 'Sending...' : 'Send test Teams'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Info messages for unavailable integrations */}
+            {(!integrations?.slackAvailable || !integrations?.teamsAvailable) && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-sm text-yellow-800">
+                  {!integrations?.slackAvailable && !integrations?.teamsAvailable && (
+                    <>Slack and Teams notifications require admin configuration. Ask your admin to connect Slack/Teams in the{' '}
+                      <a href="/admin/integrations/notifications" className="underline">integrations settings</a>.</>
+                  )}
+                  {!integrations?.slackAvailable && integrations?.teamsAvailable && (
+                    <>Slack notifications require admin configuration. Ask your admin to connect Slack in the{' '}
+                      <a href="/admin/integrations/notifications" className="underline">integrations settings</a>.</>
+                  )}
+                  {integrations?.slackAvailable && !integrations?.teamsAvailable && (
+                    <>Teams notifications require admin configuration. Ask your admin to connect Teams in the{' '}
+                      <a href="/admin/integrations/notifications" className="underline">integrations settings</a>.</>
+                  )}
+                </p>
+              </div>
+            )}
 
             {/* Test Alert Button */}
             <div className="pt-4 border-t">

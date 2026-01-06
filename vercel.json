@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/apply-retention",
       "schedule": "15 3 * * *"
+    },
+    {
+      "path": "/api/cron/retry-notifications",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

@@ -39,8 +39,13 @@ export async function GET(request: Request) {
         RUN_ALERTS: null as any,
         APPLY_RETENTION: null as any,
         SYNC_AWS_CUR: null as any,
+        RETRY_NOTIFICATIONS: null as any,
       },
       recentErrors: [] as any[],
+      notificationFailures: {
+        byChannel: {} as Record<string, number>,
+        total: 0,
+      },
     }
 
     // Test DB connection and get latency
@@ -83,9 +88,33 @@ export async function GET(request: Request) {
       health.migrations.error = error.message
     }
 
+    // Get failed notification deliveries (last 20) - org-agnostic for admin view
+    try {
+      const failedDeliveries = await prisma.notificationDelivery.findMany({
+        where: {
+          status: 'FAILED',
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: {
+          channel: true,
+        },
+      })
+
+      const failuresByChannel: Record<string, number> = {}
+      failedDeliveries.forEach((d) => {
+        failuresByChannel[d.channel] = (failuresByChannel[d.channel] || 0) + 1
+      })
+
+      health.notificationFailures.byChannel = failuresByChannel
+      health.notificationFailures.total = failedDeliveries.length
+    } catch (error: any) {
+      // Ignore errors
+    }
+
     // Get last run per cron type
     try {
-      const cronTypes = ['RUN_ALERTS', 'APPLY_RETENTION', 'SYNC_AWS_CUR']
+      const cronTypes = ['RUN_ALERTS', 'APPLY_RETENTION', 'SYNC_AWS_CUR', 'RETRY_NOTIFICATIONS']
       for (const type of cronTypes) {
         const lastRun = await prisma.cronRun.findFirst({
           where: { type },

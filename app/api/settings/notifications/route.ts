@@ -33,11 +33,30 @@ export async function GET(request: Request) {
           userId: user.id,
           emailEnabled: true,
           telegramEnabled: false,
+          slackEnabled: false,
+          teamsEnabled: false,
         },
       })
     }
 
-    return NextResponse.json(preference)
+    // Check org integrations to show available channels
+    const integration = await prisma.orgIntegration.findUnique({
+      where: { orgId: activeOrg.id },
+      select: {
+        slackWebhookUrlEnc: true,
+        teamsWebhookUrlEnc: true,
+        telegramBotTokenEnc: true,
+      },
+    })
+
+    return NextResponse.json({
+      ...preference,
+      integrations: {
+        slackAvailable: !!integration?.slackWebhookUrlEnc,
+        teamsAvailable: !!integration?.teamsWebhookUrlEnc,
+        telegramAvailable: !!integration?.telegramBotTokenEnc,
+      },
+    })
   } catch (error: any) {
     console.error('Error fetching notification preferences:', error)
     return NextResponse.json({ error: error.message || 'Failed to fetch preferences' }, { status: 500 })
@@ -58,11 +77,28 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { emailEnabled, telegramEnabled, telegramChatId } = body
+    const { emailEnabled, telegramEnabled, telegramChatId, slackEnabled, teamsEnabled } = body
 
     // Validate telegramChatId if telegramEnabled
     if (telegramEnabled && !telegramChatId) {
       return NextResponse.json({ error: 'Telegram Chat ID is required when Telegram is enabled' }, { status: 400 })
+    }
+
+    // Check if org has Slack/Teams configured
+    const integration = await prisma.orgIntegration.findUnique({
+      where: { orgId: activeOrg.id },
+      select: {
+        slackWebhookUrlEnc: true,
+        teamsWebhookUrlEnc: true,
+      },
+    })
+
+    if (slackEnabled && !integration?.slackWebhookUrlEnc) {
+      return NextResponse.json({ error: 'Slack is not configured for this organization. Ask your admin to connect Slack.' }, { status: 400 })
+    }
+
+    if (teamsEnabled && !integration?.teamsWebhookUrlEnc) {
+      return NextResponse.json({ error: 'Teams is not configured for this organization. Ask your admin to connect Teams.' }, { status: 400 })
     }
 
     const preference = await prisma.notificationPreference.upsert({
@@ -76,6 +112,8 @@ export async function POST(request: Request) {
         emailEnabled: emailEnabled !== undefined ? emailEnabled : undefined,
         telegramEnabled: telegramEnabled !== undefined ? telegramEnabled : undefined,
         telegramChatId: telegramChatId !== undefined ? telegramChatId : undefined,
+        slackEnabled: slackEnabled !== undefined ? slackEnabled : undefined,
+        teamsEnabled: teamsEnabled !== undefined ? teamsEnabled : undefined,
       },
       create: {
         orgId: activeOrg.id,
@@ -83,6 +121,8 @@ export async function POST(request: Request) {
         emailEnabled: emailEnabled !== undefined ? emailEnabled : true,
         telegramEnabled: telegramEnabled !== undefined ? telegramEnabled : false,
         telegramChatId: telegramChatId || null,
+        slackEnabled: slackEnabled !== undefined ? slackEnabled : false,
+        teamsEnabled: teamsEnabled !== undefined ? teamsEnabled : false,
       },
     })
 
