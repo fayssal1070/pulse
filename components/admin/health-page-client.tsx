@@ -59,6 +59,21 @@ interface HealthData {
     finishedAt: string | null
     error: string | null
   }>
+  apiKeys?: {
+    active: number
+    revoked: number
+    neverUsed: number
+    lastUsedOldest: string | null
+    lastUsedNewest: string | null
+  }
+  recentKeyAudits?: Array<{
+    id: string
+    apiKeyId: string
+    actorUserId: string
+    action: string
+    createdAt: string
+    meta: any
+  }>
   notificationFailures?: {
     byChannel: Record<string, number>
     total: number
