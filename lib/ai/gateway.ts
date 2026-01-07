@@ -535,6 +535,8 @@ export async function processAiRequest(
         estimatedCostEur: 0,
         rawRef: {
           error: sanitizedError,
+          overQuota: quotaCheck.isOver,
+          quotaPercentage: quotaCheck.percentage,
         },
       },
     })
