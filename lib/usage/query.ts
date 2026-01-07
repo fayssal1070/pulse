@@ -450,7 +450,6 @@ export async function getUsageExport(
     orgId,
     source: 'AI',
     occurredAt: { gte: startDate, lte: endDate },
-    ...(userId ? { userId } : {}),
   }
 
   const events = await prisma.costEvent.findMany({
@@ -463,19 +462,35 @@ export async function getUsageExport(
       teamId: true,
       provider: true,
       amountEur: true,
-      userId: true,
+      dimensions: true,
       source: true,
       rawRef: true,
     },
     orderBy: { occurredAt: 'asc' },
   })
 
+  // Extract userId from dimensions JSON and filter if needed
+  const userIdsSet = new Set<string>()
+  const filteredEvents = userId
+    ? events.filter((e) => {
+        const dims = (e.dimensions as any) || {}
+        const eventUserId = dims.userId
+        if (eventUserId) userIdsSet.add(eventUserId)
+        return eventUserId === userId
+      })
+    : events.map((e) => {
+        const dims = (e.dimensions as any) || {}
+        const eventUserId = dims.userId
+        if (eventUserId) userIdsSet.add(eventUserId)
+        return e
+      })
+
   // Resolve IDs to names
-  const appIds = [...new Set(events.map((e) => e.appId).filter(Boolean))]
-  const projectIds = [...new Set(events.map((e) => e.projectId).filter(Boolean))]
-  const clientIds = [...new Set(events.map((e) => e.clientId).filter(Boolean))]
-  const teamIds = [...new Set(events.map((e) => e.teamId).filter(Boolean))]
-  const userIds = [...new Set(events.map((e) => e.userId).filter(Boolean))]
+  const appIds = [...new Set(filteredEvents.map((e) => e.appId).filter(Boolean))]
+  const projectIds = [...new Set(filteredEvents.map((e) => e.projectId).filter(Boolean))]
+  const clientIds = [...new Set(filteredEvents.map((e) => e.clientId).filter(Boolean))]
+  const teamIds = [...new Set(filteredEvents.map((e) => e.teamId).filter(Boolean))]
+  const userIds = [...userIdsSet]
 
   const [apps, projects, clients, teams, users] = await Promise.all([
     appIds.length > 0 ? prisma.app.findMany({ where: { id: { in: appIds as string[] }, orgId }, select: { id: true, name: true } }) : [],
@@ -491,17 +506,21 @@ export async function getUsageExport(
   const teamsMap = new Map(teams.map((t) => [t.id, t.name]))
   const usersMap = new Map(users.map((u) => [u.id, u.email]))
 
-  return events.map((event) => ({
-    date: event.occurredAt.toISOString().split('T')[0],
-    app: event.appId ? appsMap.get(event.appId) || '' : '',
-    project: event.projectId ? projectsMap.get(event.projectId) || '' : '',
-    client: event.clientId ? clientsMap.get(event.clientId) || '' : '',
-    team: event.teamId ? teamsMap.get(event.teamId) || '' : '',
-    provider: event.provider || '',
-    amountEUR: event.amountEur ? parseFloat(event.amountEur.toString()) : 0,
-    userEmail: event.userId ? usersMap.get(event.userId) || null : null,
-    source: event.source || 'AI',
-    rawRef: event.rawRef ? JSON.stringify(event.rawRef) : null,
-  }))
+  return filteredEvents.map((event) => {
+    const dims = (event.dimensions as any) || {}
+    const eventUserId = dims.userId || null
+    return {
+      date: event.occurredAt.toISOString().split('T')[0],
+      app: event.appId ? appsMap.get(event.appId) || '' : '',
+      project: event.projectId ? projectsMap.get(event.projectId) || '' : '',
+      client: event.clientId ? clientsMap.get(event.clientId) || '' : '',
+      team: event.teamId ? teamsMap.get(event.teamId) || '' : '',
+      provider: event.provider || '',
+      amountEUR: event.amountEur ? parseFloat(event.amountEur.toString()) : 0,
+      userEmail: eventUserId ? usersMap.get(eventUserId) || null : null,
+      source: event.source || 'AI',
+      rawRef: event.rawRef ? JSON.stringify(event.rawRef) : null,
+    }
+  })
 }
 
