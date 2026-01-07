@@ -387,6 +387,14 @@ export async function processAiRequest(
       apiResponse.outputTokens
     )
 
+    // PR30: Check if over quota (log but don't block)
+    const quotaCheck = await isOverQuota(input.orgId).catch(() => ({
+      isOver: false,
+      current: 0,
+      included: 0,
+      percentage: 0,
+    }))
+
     // Create AiRequestLog
     const requestLog = await prisma.aiRequestLog.create({
       data: {
