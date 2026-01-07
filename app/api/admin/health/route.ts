@@ -313,51 +313,69 @@ export async function GET(request: Request) {
 
     // Get plan status and Stripe info for active organization (if available)
     try {
-      const activeOrg = await getActiveOrganization(user.id)
-      if (activeOrg) {
-        const plan = await getOrgPlan(activeOrg.id)
-        const entitlements = getEntitlements(plan)
-        health.planStatus = {
-          plan,
-          entitlements: {
-            maxProviders: entitlements.maxProviders,
-            maxRoutes: entitlements.maxRoutes,
-            maxAlertRules: entitlements.maxAlertRules,
-            telegramEnabled: entitlements.telegramEnabled,
-            slackEnabled: entitlements.slackEnabled,
-            teamsEnabled: entitlements.teamsEnabled,
-            webhooksEnabled: entitlements.webhooksEnabled,
-            costsExportEnabled: entitlements.costsExportEnabled,
-            maxRetentionDays: entitlements.maxRetentionDays,
-            maxApiKeys: entitlements.maxApiKeys,
-            apiKeyRotationEnabled: entitlements.apiKeyRotationEnabled,
-          },
-        }
-
-        // Stripe info
-        health.stripe.customerId = activeOrg.stripeCustomerId
-        health.stripe.subscriptionId = activeOrg.stripeSubscriptionId
-        health.stripe.subscriptionStatus = activeOrg.subscriptionStatus
-        health.stripe.currentPeriodEnd = activeOrg.currentPeriodEnd?.toISOString() || null
-
-        // Get last Stripe event for this org
-        const lastEvent = await prisma.stripeEvent.findFirst({
-          where: { orgId: activeOrg.id },
-          orderBy: { createdAt: 'desc' },
+      const activeOrgBasic = await getActiveOrganization(user.id)
+      if (activeOrgBasic) {
+        // Fetch full organization with Stripe fields
+        const activeOrg = await prisma.organization.findUnique({
+          where: { id: activeOrgBasic.id },
           select: {
             id: true,
-            type: true,
-            createdAt: true,
-            status: true,
+            plan: true,
+            subscriptionStatus: true,
+            stripeCustomerId: true,
+            stripeSubscriptionId: true,
+            stripePriceId: true,
+            currentPeriodEnd: true,
+            cancelAtPeriodEnd: true,
+            trialEndsAt: true,
           },
         })
 
-        if (lastEvent) {
-          health.stripe.lastStripeEvent = {
-            id: lastEvent.id,
-            type: lastEvent.type,
-            createdAt: lastEvent.createdAt.toISOString(),
-            status: lastEvent.status,
+        if (activeOrg) {
+          const plan = await getOrgPlan(activeOrg.id)
+          const entitlements = getEntitlements(plan)
+          health.planStatus = {
+            plan,
+            entitlements: {
+              maxProviders: entitlements.maxProviders,
+              maxRoutes: entitlements.maxRoutes,
+              maxAlertRules: entitlements.maxAlertRules,
+              telegramEnabled: entitlements.telegramEnabled,
+              slackEnabled: entitlements.slackEnabled,
+              teamsEnabled: entitlements.teamsEnabled,
+              webhooksEnabled: entitlements.webhooksEnabled,
+              costsExportEnabled: entitlements.costsExportEnabled,
+              maxRetentionDays: entitlements.maxRetentionDays,
+              maxApiKeys: entitlements.maxApiKeys,
+              apiKeyRotationEnabled: entitlements.apiKeyRotationEnabled,
+            },
+          }
+
+          // Stripe info
+          health.stripe.customerId = activeOrg.stripeCustomerId
+          health.stripe.subscriptionId = activeOrg.stripeSubscriptionId
+          health.stripe.subscriptionStatus = activeOrg.subscriptionStatus
+          health.stripe.currentPeriodEnd = activeOrg.currentPeriodEnd?.toISOString() || null
+
+          // Get last Stripe event for this org
+          const lastEvent = await prisma.stripeEvent.findFirst({
+            where: { orgId: activeOrg.id },
+            orderBy: { createdAt: 'desc' },
+            select: {
+              id: true,
+              type: true,
+              createdAt: true,
+              status: true,
+            },
+          })
+
+          if (lastEvent) {
+            health.stripe.lastStripeEvent = {
+              id: lastEvent.id,
+              type: lastEvent.type,
+              createdAt: lastEvent.createdAt.toISOString(),
+              status: lastEvent.status,
+            }
           }
         }
       }
