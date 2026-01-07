@@ -4,6 +4,7 @@
 
 import { createHash } from 'crypto'
 import { prisma } from '@/lib/prisma'
+import { isOverQuota } from '@/lib/billing/overage'
 import { checkPolicies, type RequestContext } from './policy'
 import { estimateCost, getProviderFromModel } from './pricing'
 import { computeBudgetStatus } from '@/lib/alerts/engine'
