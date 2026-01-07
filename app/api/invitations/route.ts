@@ -36,8 +36,9 @@ export async function POST(request: NextRequest) {
 
     // Check entitlements
     try {
-      const { assertCanInviteMember } = await import('@/lib/entitlements')
-      await assertCanInviteMember(orgId)
+      // PR29: Check seat availability before inviting
+      const { assertSeatAvailable } = await import('@/lib/billing/entitlements')
+      await assertSeatAvailable(orgId)
     } catch (error: any) {
       if (error.message?.includes('LIMIT_REACHED')) {
         return NextResponse.json(
