@@ -114,6 +114,14 @@ export default async function DashboardPage({
             <KPICards kpis={kpis} />
 
             {/* AI Spend Card (Admin/Finance only) */}
+            {/* Plan Card (Admin only) */}
+            {isAdminUser && (
+              <div className="mb-6">
+                <PlanCard />
+              </div>
+            )}
+
+            {/* AI Spend Card (Admin or Finance) */}
             {(isAdminUser || isFinanceUser) && (
               <div className="mb-6">
                 <AISpendCard />
