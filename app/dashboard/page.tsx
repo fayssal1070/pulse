@@ -27,6 +27,7 @@ import DiagnosticsCard from '@/components/dashboard/diagnostics-card'
 import AISpendCard from '@/components/dashboard/ai-spend-card'
 import PlanCard from '@/components/dashboard/plan-card'
 import SeatsCard from '@/components/dashboard/seats-card'
+import UsageCard from '@/components/dashboard/usage-card'
 import Link from 'next/link'
 import { isFinance } from '@/lib/admin-helpers'
 
@@ -126,6 +127,13 @@ export default async function DashboardPage({
             {isAdminUser && (
               <div className="mb-6">
                 <SeatsCard />
+              </div>
+            )}
+
+            {/* Usage Card (Admin only) - PR30 */}
+            {isAdminUser && (
+              <div className="mb-6">
+                <UsageCard />
               </div>
             )}
 

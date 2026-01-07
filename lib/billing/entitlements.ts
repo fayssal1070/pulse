@@ -52,6 +52,11 @@ export interface Entitlements {
   
   // Seats (PR29)
   seatLimit: number
+  
+  // Usage quotas and overages (PR30)
+  includedMonthlySpendEUR: number // Quota AI spend included per month
+  overagePricePerEUR: number // Multiplier for overage (e.g., 1.20 = 20% markup)
+  allowOverage: boolean // Whether overage is allowed (vs hard block)
 }
 
 const ENTITLEMENTS: Record<Plan, Entitlements> = {
@@ -105,6 +110,9 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
     apiKeyRotationEnabled: true,
     apiKeyAdvancedLimitsEnabled: true,
     seatLimit: 25,
+    includedMonthlySpendEUR: 2000,
+    overagePricePerEUR: 1.10, // 10% markup for BUSINESS
+    allowOverage: true, // BUSINESS: allow overage
   },
 }
 

@@ -8,6 +8,7 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { getActiveOrganization } from '@/lib/active-org'
 import { prisma } from '@/lib/prisma'
 import { getOrgPlan, getEntitlements } from '@/lib/billing/entitlements'
+import { computeCurrentMonthUsage, isOverQuota } from '@/lib/billing/overage'
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,6 +42,10 @@ export async function GET(request: NextRequest) {
     const plan = await getOrgPlan(activeOrg.id)
     const entitlements = getEntitlements(plan)
 
+    // PR30: Get current month usage and overage
+    const usageData = await computeCurrentMonthUsage(activeOrg.id)
+    const quotaCheck = await isOverQuota(activeOrg.id)
+
     return NextResponse.json({
       plan,
       status: activeOrg.subscriptionStatus,
@@ -61,6 +66,17 @@ export async function GET(request: NextRequest) {
         maxApiKeys: entitlements.maxApiKeys,
         apiKeyRotationEnabled: entitlements.apiKeyRotationEnabled,
         apiKeyAdvancedLimitsEnabled: entitlements.apiKeyAdvancedLimitsEnabled,
+        includedMonthlySpendEUR: entitlements.includedMonthlySpendEUR,
+        overagePricePerEUR: entitlements.overagePricePerEUR,
+        allowOverage: entitlements.allowOverage,
+      },
+      usage: {
+        totalSpendEUR: usageData.totalSpendEUR,
+        includedSpendEUR: usageData.includedSpendEUR,
+        overageSpendEUR: usageData.overageSpendEUR,
+        overageAmountEUR: usageData.overageAmountEUR,
+        isOverQuota: quotaCheck.isOver,
+        quotaPercentage: quotaCheck.percentage,
       },
     })
   } catch (error: any) {

@@ -70,6 +70,7 @@ model Organization {
   notificationDeliveries  NotificationDelivery[]
   apiKeyAudits            ApiKeyAudit[]
   stripeEvents            StripeEvent[]
+  monthlyUsages           MonthlyUsage[]
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
@@ -742,4 +743,26 @@ model StripeEvent {
   @@index([status])
   @@index([createdAt])
   @@index([orgId])
+}
+
+// Monthly usage snapshot for overage billing (PR30)
+model MonthlyUsage {
+  id                String       @id @default(cuid())
+  orgId             String
+  year              Int
+  month             Int // 1-12
+  totalSpendEUR     Float        @default(0)
+  includedSpendEUR  Float        @default(0) // Quota included in plan
+  overageSpendEUR   Float        @default(0) // Amount over quota
+  overageAmountEUR  Float        @default(0) // Overage amount with markup
+  finalized         Boolean      @default(false) // Whether invoice item created
+  stripeInvoiceItemId String?    // Stripe invoice item ID if created
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  organization      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, year, month])
+  @@index([orgId])
+  @@index([year, month])
+  @@index([finalized])
 }

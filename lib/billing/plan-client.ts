@@ -24,6 +24,17 @@ export interface PlanInfo {
     maxApiKeys: number
     apiKeyRotationEnabled: boolean
     apiKeyAdvancedLimitsEnabled: boolean
+    includedMonthlySpendEUR: number
+    overagePricePerEUR: number
+    allowOverage: boolean
+  }
+  usage?: {
+    totalSpendEUR: number
+    includedSpendEUR: number
+    overageSpendEUR: number
+    overageAmountEUR: number
+    isOverQuota: boolean
+    quotaPercentage: number
   }
 }
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Download, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react'
+import { getPlanInfo, PlanInfo } from '@/lib/billing/plan-client'
 
 interface UsageSummary {
   totalMtdEUR: number
@@ -25,6 +26,7 @@ interface UsagePageClientProps {
 export default function UsagePageClient({ organizationId }: UsagePageClientProps) {
   const [summary, setSummary] = useState<UsageSummary | null>(null)
   const [breakdown, setBreakdown] = useState<UsageBreakdownItem[]>([])
+  const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null)
   const [activeTab, setActiveTab] = useState<'app' | 'provider' | 'user' | 'project'>('app')
   const [dateRange, setDateRange] = useState<'7d' | '30d' | 'mtd' | 'lastMonth'>('mtd')
   const [loading, setLoading] = useState(true)
@@ -32,7 +34,17 @@ export default function UsagePageClient({ organizationId }: UsagePageClientProps
 
   useEffect(() => {
     loadSummary()
+    loadPlanInfo()
   }, [])
+
+  const loadPlanInfo = async () => {
+    try {
+      const info = await getPlanInfo()
+      setPlanInfo(info)
+    } catch (err) {
+      console.error('Failed to load plan info:', err)
+    }
+  }
 
   useEffect(() => {
     loadBreakdown()
@@ -101,6 +113,69 @@ export default function UsagePageClient({ organizationId }: UsagePageClientProps
           Export finance CSV
         </button>
       </div>
+
+      {/* PR30: Overage Information Card */}
+      {planInfo?.usage && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6 border-l-4 border-indigo-500">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Usage & Quota</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <p className="text-sm text-gray-600">Included Quota</p>
+              <p className="text-2xl font-bold text-gray-900">€{planInfo.usage.includedSpendEUR.toFixed(2)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Current Usage</p>
+              <p className={`text-2xl font-bold ${planInfo.usage.isOverQuota ? 'text-red-600' : 'text-gray-900'}`}>
+                €{planInfo.usage.totalSpendEUR.toFixed(2)}
+              </p>
+            </div>
+            {planInfo.usage.isOverQuota && (
+              <>
+                <div>
+                  <p className="text-sm text-gray-600">Overage</p>
+                  <p className="text-2xl font-bold text-orange-600">€{planInfo.usage.overageSpendEUR.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Estimated Bill</p>
+                  <p className="text-2xl font-bold text-red-600">€{planInfo.usage.overageAmountEUR.toFixed(2)}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    (€{planInfo.usage.overageSpendEUR.toFixed(2)} × {planInfo.entitlements.overagePricePerEUR.toFixed(2)}x markup)
+                  </p>
+                </div>
+              </>
+            )}
+            {!planInfo.usage.isOverQuota && (
+              <div>
+                <p className="text-sm text-gray-600">Remaining</p>
+                <p className="text-2xl font-bold text-green-600">
+                  €{(planInfo.usage.includedSpendEUR - planInfo.usage.totalSpendEUR).toFixed(2)}
+                </p>
+              </div>
+            )}
+          </div>
+          {/* Progress bar */}
+          <div className="mt-4">
+            <div className="w-full bg-gray-200 rounded-full h-3">
+              <div
+                className={`h-3 rounded-full ${
+                  planInfo.usage.quotaPercentage >= 200
+                    ? 'bg-red-500'
+                    : planInfo.usage.quotaPercentage >= 100
+                    ? 'bg-orange-500'
+                    : planInfo.usage.quotaPercentage >= 80
+                    ? 'bg-yellow-500'
+                    : 'bg-green-500'
+                }`}
+                style={{ width: `${Math.min(planInfo.usage.quotaPercentage, 200)}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {planInfo.usage.quotaPercentage.toFixed(1)}% of quota used
+              {planInfo.usage.quotaPercentage >= 200 && ' — Warning: 200%+ quota usage'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
