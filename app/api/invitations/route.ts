@@ -34,17 +34,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check entitlements
+    // PR29: Check seat availability before inviting
     try {
-      // PR29: Check seat availability before inviting
       const { assertSeatAvailable } = await import('@/lib/billing/entitlements')
       await assertSeatAvailable(orgId)
     } catch (error: any) {
-      if (error.message?.includes('LIMIT_REACHED')) {
+      // Handle EntitlementError (upgrade_required)
+      if (error.name === 'EntitlementError' || error.code === 'upgrade_required') {
         return NextResponse.json(
           {
-            error: error.message,
-            code: 'LIMIT_REACHED',
+            ok: false,
+            code: 'upgrade_required',
+            feature: error.feature || 'seats',
+            message: error.message,
+            plan: error.plan || 'STARTER',
+            required: error.requiredPlan || 'PRO',
           },
           { status: 402 }
         )
@@ -54,6 +58,40 @@ export async function POST(request: NextRequest) {
 
     // Créer l'invitation
     const invitation = await createInvitation(orgId, email)
+    
+    // PR29: Create or update membership with status='invited' when invitation is created
+    try {
+      const { prisma } = await import('@/lib/prisma')
+      const invitedUser = await prisma.user.findUnique({ 
+        where: { email: email.toLowerCase().trim() } 
+      })
+      if (invitedUser) {
+        // User exists, create/update membership with invited status
+        await prisma.membership.upsert({
+          where: {
+            userId_orgId: {
+              userId: invitedUser.id,
+              orgId,
+            },
+          },
+          create: {
+            userId: invitedUser.id,
+            orgId,
+            role: 'member',
+            status: 'invited',
+            invitedAt: new Date(),
+          },
+          update: {
+            status: 'invited',
+            invitedAt: new Date(),
+          },
+        })
+      }
+    } catch (err) {
+      // Non-critical: membership creation can fail if user doesn't exist yet
+      // The membership will be created when invitation is accepted
+      console.warn('Could not create membership for invited user:', err)
+    }
 
     // Générer le lien d'invitation
     // Extract origin only from NEXTAUTH_URL (no path), fallback to localhost for dev
