@@ -286,9 +286,9 @@ export async function getUsageBreakdown(
       const userIds = topUsers.map(([id]) => id)
       const users = await prisma.user.findMany({
         where: { id: { in: userIds } },
-        select: { id: true, email: true, name: true },
+        select: { id: true, email: true },
       })
-      const usersMap = new Map(users.map((u) => [u.id, u.name || u.email]))
+      const usersMap = new Map(users.map((u) => [u.id, u.email]))
 
       results = topUsers.map(([userId, amountEUR]) => {
         const trend7dEUR = trendMap.get(userId) || 0
