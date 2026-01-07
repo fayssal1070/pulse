@@ -267,7 +267,9 @@ async function processStripeEvent(event: Stripe.Event, stripe: Stripe) {
     case 'invoice.payment_failed': {
       const invoice = event.data.object as Stripe.Invoice
       const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id
-      const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id
+      const subscriptionId = typeof (invoice as any).subscription === 'string' 
+        ? (invoice as any).subscription 
+        : (invoice as any).subscription?.id
 
       if (!customerId || !subscriptionId) {
         // Not a subscription invoice
