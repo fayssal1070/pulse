@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { getStripeClient, getWebhookSecret } from '@/lib/stripe/client'
 import { getPlanForPriceId } from '@/lib/stripe/plans'
+import { getSeatLimit } from '@/lib/billing/entitlements'
 import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
 
@@ -162,6 +163,7 @@ async function processStripeEvent(event: Stripe.Event, stripe: Stripe) {
           currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
           cancelAtPeriodEnd: (subscription as any).cancel_at_period_end || false,
           trialEndsAt: (subscription as any).trial_end ? new Date((subscription as any).trial_end * 1000) : null,
+          seatLimit: getSeatLimit(plan), // Update seat limit based on plan (PR29)
         },
       })
 
@@ -213,6 +215,7 @@ async function processStripeEvent(event: Stripe.Event, stripe: Stripe) {
           currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
           cancelAtPeriodEnd: (subscription as any).cancel_at_period_end || false,
           trialEndsAt: (subscription as any).trial_end ? new Date((subscription as any).trial_end * 1000) : null,
+          seatLimit: getSeatLimit(plan), // Update seat limit based on plan (PR29)
         },
       })
 
@@ -251,6 +254,7 @@ async function processStripeEvent(event: Stripe.Event, stripe: Stripe) {
           stripePriceId: null,
           cancelAtPeriodEnd: false,
           trialEndsAt: null,
+          seatLimit: getSeatLimit('STARTER'), // Reset to STARTER seat limit (PR29)
           // Keep customer ID for potential re-subscription
         },
       })
