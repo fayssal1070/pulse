@@ -104,6 +104,7 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
     maxApiKeys: 1000, // Effectively unlimited
     apiKeyRotationEnabled: true,
     apiKeyAdvancedLimitsEnabled: true,
+    seatLimit: 25,
   },
 }
 
