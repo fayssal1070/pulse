@@ -104,12 +104,26 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
 /**
  * Get organization plan
  * Falls back to ENV DEFAULT_PLAN or STARTER
+ * 
+ * PR27: If subscription status is not ACTIVE/TRIALING, treat as STARTER for gating
  */
 export async function getOrgPlan(orgId: string): Promise<Plan> {
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
-    select: { plan: true },
+    select: {
+      plan: true,
+      subscriptionStatus: true,
+    },
   })
+
+  // If subscription exists but is not active/trialing, downgrade to STARTER for gating
+  if (org?.subscriptionStatus) {
+    const activeStatuses = ['active', 'trialing']
+    if (!activeStatuses.includes(org.subscriptionStatus.toLowerCase())) {
+      // Subscription exists but not active - treat as STARTER
+      return 'STARTER'
+    }
+  }
 
   const planFromDb = org?.plan?.toUpperCase()
   

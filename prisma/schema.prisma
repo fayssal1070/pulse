@@ -24,13 +24,14 @@ model Organization {
   telegramChatId          String?
   demoDataLoadedAt        DateTime?
   onboardingCompletedAt   DateTime?
-  plan                    String                   @default("FREE") // "FREE" | "PRO" | "BUSINESS"
-  stripeCustomerId        String?
-  stripeSubscriptionId    String?
+  plan                    String                   @default("STARTER") // "STARTER" | "PRO" | "BUSINESS" (source: Stripe via webhooks)
+  stripeCustomerId        String?                  @unique
+  stripeSubscriptionId    String?                  @unique
   stripePriceId           String?
-  subscriptionStatus      String? // "active", "trialing", "past_due", "canceled", etc.
+  subscriptionStatus      String? // "trialing" | "active" | "past_due" | "canceled" | "incomplete" | "unpaid"
   currentPeriodEnd        DateTime?
   cancelAtPeriodEnd       Boolean                  @default(false)
+  trialEndsAt             DateTime?
   // AWS CUR configuration
   awsCurEnabled           Boolean                  @default(false)
   awsCurBucket            String?
@@ -65,6 +66,7 @@ model Organization {
   webhookDeliveries       OrgWebhookDelivery[]
   notificationDeliveries  NotificationDelivery[]
   apiKeyAudits            ApiKeyAudit[]
+  stripeEvents            StripeEvent[]
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
@@ -714,4 +716,22 @@ model OrgWebhookDelivery {
   @@index([createdAt])
   @@index([orgId])
   @@index([requestId])
+}
+
+// Stripe webhook events (for idempotence and audit)
+model StripeEvent {
+  id          String    @id // Stripe event ID (evt_...)
+  type        String // e.g., "checkout.session.completed", "customer.subscription.updated"
+  createdAt   DateTime  @default(now())
+  processedAt DateTime? // When we processed it
+  orgId       String? // Organization this event relates to (if known)
+  status      String    @default("PENDING") // "PENDING" | "PROCESSED" | "FAILED"
+  error       String? // Error message if status = "FAILED"
+  organization Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+
+  @@unique([id])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@index([orgId])
 }

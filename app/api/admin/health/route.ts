@@ -57,6 +57,13 @@ export async function GET(request: Request) {
           },
           recentKeyAudits: [] as any[],
           planStatus: null as any,
+          stripe: {
+            customerId: null as string | null,
+            subscriptionId: null as string | null,
+            subscriptionStatus: null as string | null,
+            currentPeriodEnd: null as string | null,
+            lastStripeEvent: null as any,
+          },
         }
 
     // Test DB connection and get latency
@@ -304,7 +311,7 @@ export async function GET(request: Request) {
       // Ignore errors fetching recent errors
     }
 
-    // Get plan status for active organization (if available)
+    // Get plan status and Stripe info for active organization (if available)
     try {
       const activeOrg = await getActiveOrganization(user.id)
       if (activeOrg) {
@@ -325,6 +332,33 @@ export async function GET(request: Request) {
             maxApiKeys: entitlements.maxApiKeys,
             apiKeyRotationEnabled: entitlements.apiKeyRotationEnabled,
           },
+        }
+
+        // Stripe info
+        health.stripe.customerId = activeOrg.stripeCustomerId
+        health.stripe.subscriptionId = activeOrg.stripeSubscriptionId
+        health.stripe.subscriptionStatus = activeOrg.subscriptionStatus
+        health.stripe.currentPeriodEnd = activeOrg.currentPeriodEnd?.toISOString() || null
+
+        // Get last Stripe event for this org
+        const lastEvent = await prisma.stripeEvent.findFirst({
+          where: { orgId: activeOrg.id },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            type: true,
+            createdAt: true,
+            status: true,
+          },
+        })
+
+        if (lastEvent) {
+          health.stripe.lastStripeEvent = {
+            id: lastEvent.id,
+            type: lastEvent.type,
+            createdAt: lastEvent.createdAt.toISOString(),
+            status: lastEvent.status,
+          }
         }
       }
     } catch (error: any) {

@@ -1,71 +1,53 @@
+/**
+ * POST /api/billing/portal
+ * Create Stripe Customer Portal session
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-helpers'
-import { getOrganizationById, isOrganizationOwner } from '@/lib/organizations'
-import { prisma } from '@/lib/prisma'
-import { stripe } from '@/lib/stripe'
+import { getActiveOrganization } from '@/lib/active-org'
+import { requireAdmin } from '@/lib/admin-helpers'
+import { getStripeClient } from '@/lib/stripe/client'
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth()
-    const { orgId } = await request.json()
+    await requireAdmin()
 
-    if (!orgId) {
+    const activeOrg = await getActiveOrganization(user.id)
+    if (!activeOrg) {
+      return NextResponse.json({ error: 'No active organization' }, { status: 400 })
+    }
+
+    if (!activeOrg.stripeCustomerId) {
       return NextResponse.json(
-        { error: 'orgId is required' },
+        { error: 'No Stripe customer found. Please create a subscription first.' },
         { status: 400 }
       )
     }
 
-    // Verify user is owner
-    const organization = await getOrganizationById(orgId, user.id)
-    if (!organization) {
+    const stripe = getStripeClient()
+    if (!stripe) {
       return NextResponse.json(
-        { error: 'Organization not found or access denied' },
-        { status: 404 }
+        { error: 'Stripe is not configured. Please contact support.' },
+        { status: 503 }
       )
     }
 
-    const isOwner = await isOrganizationOwner(orgId, user.id)
-    if (!isOwner) {
-      return NextResponse.json(
-        { error: 'Only organization owners can manage billing' },
-        { status: 403 }
-      )
-    }
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || 'http://localhost:3000'
+    const returnUrl = process.env.STRIPE_PORTAL_RETURN_URL || `${baseUrl}/billing`
 
-    // Get full organization with Stripe fields
-    const orgWithStripe = await prisma.organization.findUnique({
-      where: { id: orgId },
-      select: {
-        id: true,
-        stripeCustomerId: true,
-      },
-    })
-
-    if (!orgWithStripe || !orgWithStripe.stripeCustomerId) {
-      return NextResponse.json(
-        { error: 'No active subscription found' },
-        { status: 400 }
-      )
-    }
-
-    // Get base URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000'
-    const origin = new URL(baseUrl).origin
-
-    // Create portal session
     const session = await stripe.billingPortal.sessions.create({
-      customer: orgWithStripe.stripeCustomerId,
-      return_url: `${origin}/organizations/${orgId}/billing`,
+      customer: activeOrg.stripeCustomerId,
+      return_url: returnUrl,
     })
 
-    return NextResponse.json({ portalUrl: session.url })
-  } catch (error) {
+    return NextResponse.json({ url: session.url })
+  } catch (error: any) {
     console.error('Portal error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error.message || 'Failed to create portal session' },
       { status: 500 }
     )
   }
 }
-

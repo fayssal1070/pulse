@@ -1,208 +1,308 @@
+/**
+ * POST /api/webhooks/stripe
+ * Stripe webhook handler for subscription events
+ * Handles: checkout.session.completed, customer.subscription.*, invoice.*
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe, STRIPE_PRICE_IDS } from '@/lib/stripe'
+import { headers } from 'next/headers'
+import { getStripeClient, getWebhookSecret } from '@/lib/stripe/client'
+import { getPlanForPriceId } from '@/lib/stripe/plans'
 import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+export const maxDuration = 10 // Webhooks can take time
+
+async function getRawBody(request: Request): Promise<Buffer> {
+  return Buffer.from(await request.text(), 'utf-8')
+}
 
 export async function POST(request: NextRequest) {
-  if (!webhookSecret) {
-    console.error('STRIPE_WEBHOOK_SECRET is not set')
-    return NextResponse.json(
-      { error: 'Webhook secret not configured' },
-      { status: 500 }
-    )
-  }
+  const stripe = getStripeClient()
+  const webhookSecret = getWebhookSecret()
 
-  const body = await request.text()
-  const signature = request.headers.get('stripe-signature')
-
-  if (!signature) {
-    return NextResponse.json(
-      { error: 'No signature' },
-      { status: 400 }
-    )
-  }
-
-  let event: Stripe.Event
-
-  try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
-  } catch (err: any) {
-    console.error('Webhook signature verification failed:', err.message)
-    return NextResponse.json(
-      { error: `Webhook Error: ${err.message}` },
-      { status: 400 }
-    )
+  if (!stripe || !webhookSecret) {
+    console.error('Stripe not configured')
+    return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 })
   }
 
   try {
-    switch (event.type) {
-      case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session
-        const orgId = session.metadata?.orgId
-        const plan = session.metadata?.plan
+    // Get raw body
+    const body = await getRawBody(request)
+    const headersList = await headers()
+    const signature = headersList.get('stripe-signature')
 
-        if (!orgId || !plan) {
-          console.error('Missing metadata in checkout.session.completed', { orgId, plan })
-          break
-        }
+    if (!signature) {
+      return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 })
+    }
 
-        // Get subscription from session
-        const subscriptionId = session.subscription as string
-        if (!subscriptionId) {
-          console.error('No subscription ID in checkout session')
-          break
-        }
+    // Verify webhook signature
+    let event: Stripe.Event
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+    } catch (err: any) {
+      console.error('Webhook signature verification failed:', err.message)
+      return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 })
+    }
 
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId)
-        const priceId = subscription.items.data[0]?.price.id
+    // Idempotence check: has this event been processed?
+    const existingEvent = await prisma.stripeEvent.findUnique({
+      where: { id: event.id },
+    })
 
-        // Update organization
-        await prisma.organization.update({
-          where: { id: orgId },
-          data: {
-            plan: plan as 'PRO' | 'BUSINESS',
-            stripeSubscriptionId: subscriptionId,
-            stripePriceId: priceId,
-            subscriptionStatus: subscription.status,
-            currentPeriodEnd: (subscription as any).current_period_end ? new Date((subscription as any).current_period_end * 1000) : null,
-            cancelAtPeriodEnd: (subscription as any).cancel_at_period_end || false,
-          },
-        })
+    if (existingEvent && existingEvent.status === 'PROCESSED') {
+      // Already processed, return 200
+      return NextResponse.json({ received: true, status: 'already_processed' })
+    }
 
-        console.log(`Updated org ${orgId} to plan ${plan}`)
-        break
-      }
+    // Create or update StripeEvent record
+    await prisma.stripeEvent.upsert({
+      where: { id: event.id },
+      create: {
+        id: event.id,
+        type: event.type,
+        status: 'PENDING',
+      },
+      update: {
+        type: event.type,
+      },
+    })
 
-      case 'customer.subscription.created':
-      case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription
-        const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
+    // Process event
+    try {
+      await processStripeEvent(event, stripe)
+      
+      // Mark as processed
+      await prisma.stripeEvent.update({
+        where: { id: event.id },
+        data: {
+          status: 'PROCESSED',
+          processedAt: new Date(),
+        },
+      })
+    } catch (error: any) {
+      console.error(`Error processing Stripe event ${event.id}:`, error)
+      
+      // Mark as failed
+      await prisma.stripeEvent.update({
+        where: { id: event.id },
+        data: {
+          status: 'FAILED',
+          error: error.message || 'Unknown error',
+        },
+      })
 
-        // Find organization by customer ID
-        const org = await prisma.organization.findFirst({
-          where: { stripeCustomerId: customerId },
-        })
-
-        if (!org) {
-          console.error(`Organization not found for customer ${customerId}`)
-          break
-        }
-
-        const priceId = subscription.items.data[0]?.price.id
-        const plan = priceId === STRIPE_PRICE_IDS.PRO ? 'PRO' : priceId === STRIPE_PRICE_IDS.BUSINESS ? 'BUSINESS' : 'FREE'
-
-        await prisma.organization.update({
-          where: { id: org.id },
-          data: {
-            plan,
-            stripeSubscriptionId: subscription.id,
-            stripePriceId: priceId || null,
-            subscriptionStatus: subscription.status,
-            currentPeriodEnd: (subscription as any).current_period_end ? new Date((subscription as any).current_period_end * 1000) : null,
-            cancelAtPeriodEnd: (subscription as any).cancel_at_period_end || false,
-          },
-        })
-
-        console.log(`Updated org ${org.id} subscription: ${subscription.status}`)
-        break
-      }
-
-      case 'customer.subscription.deleted': {
-        const subscription = event.data.object as Stripe.Subscription
-        const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
-
-        const org = await prisma.organization.findFirst({
-          where: { stripeCustomerId: customerId },
-        })
-
-        if (!org) {
-          console.error(`Organization not found for customer ${customerId}`)
-          break
-        }
-
-        // Downgrade to FREE plan
-        await prisma.organization.update({
-          where: { id: org.id },
-          data: {
-            plan: 'FREE',
-            stripeSubscriptionId: null,
-            stripePriceId: null,
-            subscriptionStatus: 'canceled',
-            currentPeriodEnd: null,
-            cancelAtPeriodEnd: false,
-          },
-        })
-
-        console.log(`Downgraded org ${org.id} to FREE plan`)
-        break
-      }
-
-      case 'invoice.payment_failed': {
-        const invoice = event.data.object as Stripe.Invoice
-        if (!invoice.customer) {
-          console.error('Invoice has no customer')
-          break
-        }
-        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer.id
-
-        const org = await prisma.organization.findFirst({
-          where: { stripeCustomerId: customerId },
-        })
-
-        if (org) {
-          await prisma.organization.update({
-            where: { id: org.id },
-            data: {
-              subscriptionStatus: 'past_due',
-            },
-          })
-          console.log(`Marked org ${org.id} as past_due`)
-        }
-        break
-      }
-
-      case 'invoice.paid': {
-        const invoice = event.data.object as Stripe.Invoice
-        if (!invoice.customer) {
-          console.error('Invoice has no customer')
-          break
-        }
-        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer.id
-
-        const org = await prisma.organization.findFirst({
-          where: { stripeCustomerId: customerId },
-        })
-
-        if (org && org.stripeSubscriptionId) {
-          const subscription = await stripe.subscriptions.retrieve(org.stripeSubscriptionId)
-          await prisma.organization.update({
-            where: { id: org.id },
-            data: {
-              subscriptionStatus: subscription.status,
-              currentPeriodEnd: (subscription as any).current_period_end ? new Date((subscription as any).current_period_end * 1000) : null,
-            },
-          })
-          console.log(`Updated org ${org.id} subscription status to ${subscription.status}`)
-        }
-        break
-      }
-
-      default:
-        console.log(`Unhandled event type: ${event.type}`)
+      // Still return 200 to Stripe (we don't want retries for processing errors)
+      // But log the error
+      return NextResponse.json({ received: true, status: 'processed_with_errors', error: error.message })
     }
 
     return NextResponse.json({ received: true })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Webhook handler error:', error)
     return NextResponse.json(
-      { error: 'Webhook handler failed' },
+      { error: error.message || 'Webhook processing failed' },
       { status: 500 }
     )
   }
 }
 
-// Disable body parsing for webhook route
-export const runtime = 'nodejs'
+async function processStripeEvent(event: Stripe.Event, stripe: Stripe) {
+  switch (event.type) {
+    case 'checkout.session.completed': {
+      const session = event.data.object as Stripe.Checkout.Session
+      
+      if (session.mode !== 'subscription' || !session.subscription) {
+        // Not a subscription checkout, skip
+        return
+      }
 
+      // Get subscription to find price ID
+      const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
+      const priceId = subscription.items.data[0]?.price.id
+      
+      if (!priceId) {
+        throw new Error('No price ID found in subscription')
+      }
+
+      const plan = getPlanForPriceId(priceId)
+      if (!plan) {
+        throw new Error(`Unknown price ID: ${priceId}`)
+      }
+
+      // Find organization via customer ID or metadata
+      const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id
+      const orgId = session.metadata?.orgId
+
+      if (!customerId) {
+        throw new Error('No customer ID in checkout session')
+      }
+
+      let org = null
+      if (orgId) {
+        org = await prisma.organization.findUnique({ where: { id: orgId } })
+      }
+      if (!org) {
+        org = await prisma.organization.findFirst({ where: { stripeCustomerId: customerId } })
+      }
+
+      if (!org) {
+        throw new Error(`Organization not found for customer ${customerId}`)
+      }
+
+      // Update organization
+      await prisma.organization.update({
+        where: { id: org.id },
+        data: {
+          plan,
+          stripeCustomerId: customerId,
+          stripeSubscriptionId: subscription.id,
+          stripePriceId: priceId,
+          subscriptionStatus: subscription.status,
+          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+          cancelAtPeriodEnd: subscription.cancel_at_period_end,
+          trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+        },
+      })
+
+      // Update StripeEvent with orgId
+      await prisma.stripeEvent.update({
+        where: { id: event.id },
+        data: { orgId: org.id },
+      })
+
+      break
+    }
+
+    case 'customer.subscription.created':
+    case 'customer.subscription.updated': {
+      const subscription = event.data.object as Stripe.Subscription
+      const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id
+
+      if (!customerId) {
+        throw new Error('No customer ID in subscription')
+      }
+
+      const org = await prisma.organization.findFirst({
+        where: { stripeCustomerId: customerId },
+      })
+
+      if (!org) {
+        // Subscription for unknown customer - log but don't fail
+        console.warn(`Subscription ${subscription.id} for unknown customer ${customerId}`)
+        return
+      }
+
+      const priceId = subscription.items.data[0]?.price.id
+      if (!priceId) {
+        throw new Error('No price ID in subscription')
+      }
+
+      const plan = getPlanForPriceId(priceId)
+      if (!plan) {
+        throw new Error(`Unknown price ID: ${priceId}`)
+      }
+
+      await prisma.organization.update({
+        where: { id: org.id },
+        data: {
+          plan,
+          stripeSubscriptionId: subscription.id,
+          stripePriceId: priceId,
+          subscriptionStatus: subscription.status,
+          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+          cancelAtPeriodEnd: subscription.cancel_at_period_end,
+          trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+        },
+      })
+
+      await prisma.stripeEvent.update({
+        where: { id: event.id },
+        data: { orgId: org.id },
+      })
+
+      break
+    }
+
+    case 'customer.subscription.deleted': {
+      const subscription = event.data.object as Stripe.Subscription
+      const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id
+
+      if (!customerId) {
+        throw new Error('No customer ID in subscription')
+      }
+
+      const org = await prisma.organization.findFirst({
+        where: { stripeCustomerId: customerId },
+      })
+
+      if (!org) {
+        console.warn(`Subscription deletion for unknown customer ${customerId}`)
+        return
+      }
+
+      // Downgrade to STARTER and mark as canceled
+      await prisma.organization.update({
+        where: { id: org.id },
+        data: {
+          plan: 'STARTER',
+          subscriptionStatus: 'canceled',
+          stripeSubscriptionId: null,
+          stripePriceId: null,
+          cancelAtPeriodEnd: false,
+          trialEndsAt: null,
+          // Keep customer ID for potential re-subscription
+        },
+      })
+
+      await prisma.stripeEvent.update({
+        where: { id: event.id },
+        data: { orgId: org.id },
+      })
+
+      break
+    }
+
+    case 'invoice.payment_succeeded':
+    case 'invoice.payment_failed': {
+      const invoice = event.data.object as Stripe.Invoice
+      const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id
+      const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id
+
+      if (!customerId || !subscriptionId) {
+        // Not a subscription invoice
+        return
+      }
+
+      const org = await prisma.organization.findFirst({
+        where: { stripeCustomerId: customerId },
+      })
+
+      if (!org) {
+        return
+      }
+
+      // Get subscription to update status
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId as string)
+
+      await prisma.organization.update({
+        where: { id: org.id },
+        data: {
+          subscriptionStatus: subscription.status,
+          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        },
+      })
+
+      await prisma.stripeEvent.update({
+        where: { id: event.id },
+        data: { orgId: org.id },
+      })
+
+      break
+    }
+
+    default:
+      // Unknown event type - log but don't fail
+      console.log(`Unhandled Stripe event type: ${event.type}`)
+  }
+}
