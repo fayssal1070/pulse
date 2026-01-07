@@ -159,9 +159,9 @@ async function processStripeEvent(event: Stripe.Event, stripe: Stripe) {
           stripeSubscriptionId: subscription.id,
           stripePriceId: priceId,
           subscriptionStatus: subscription.status,
-          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-          cancelAtPeriodEnd: subscription.cancel_at_period_end,
-          trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+          currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+          cancelAtPeriodEnd: (subscription as any).cancel_at_period_end || false,
+          trialEndsAt: (subscription as any).trial_end ? new Date((subscription as any).trial_end * 1000) : null,
         },
       })
 
@@ -210,9 +210,9 @@ async function processStripeEvent(event: Stripe.Event, stripe: Stripe) {
           stripeSubscriptionId: subscription.id,
           stripePriceId: priceId,
           subscriptionStatus: subscription.status,
-          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-          cancelAtPeriodEnd: subscription.cancel_at_period_end,
-          trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+          currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
+          cancelAtPeriodEnd: (subscription as any).cancel_at_period_end || false,
+          trialEndsAt: (subscription as any).trial_end ? new Date((subscription as any).trial_end * 1000) : null,
         },
       })
 
@@ -289,7 +289,7 @@ async function processStripeEvent(event: Stripe.Event, stripe: Stripe) {
         where: { id: org.id },
         data: {
           subscriptionStatus: subscription.status,
-          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+          currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
         },
       })
 
