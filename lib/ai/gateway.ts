@@ -516,6 +516,14 @@ export async function processAiRequest(
       .replace(/OPENAI_API_KEY/g, '[API_KEY]')
       .replace(/Bearer\s+[a-zA-Z0-9]+/g, 'Bearer [REDACTED]')
 
+    // PR30: Check quota status (even on error)
+    let quotaCheck = { isOver: false, current: 0, included: 0, percentage: 0 }
+    try {
+      quotaCheck = await isOverQuota(input.orgId)
+    } catch {
+      // Ignore quota check errors
+    }
+
     await prisma.aiRequestLog.create({
       data: {
         orgId: input.orgId,
