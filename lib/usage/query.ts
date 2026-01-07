@@ -237,41 +237,65 @@ export async function getUsageBreakdown(
     }
 
     case 'user': {
-      const userGroups = await prisma.costEvent.groupBy({
-        by: ['userId'],
-        where: {
-          ...where,
-          userId: { not: null },
+      // Fetch all events and group manually (userId is in dimensions JSON)
+      const events = await prisma.costEvent.findMany({
+        where,
+        select: {
+          id: true,
+          amountEur: true,
+          dimensions: true,
         },
-        _sum: { amountEur: true },
-        orderBy: { _sum: { amountEur: 'desc' } },
-        take: 10,
       })
 
-      const userIds = userGroups.map((g) => g.userId!).filter(Boolean)
+      const trendEvents = await prisma.costEvent.findMany({
+        where: trendWhere,
+        select: {
+          id: true,
+          amountEur: true,
+          dimensions: true,
+        },
+      })
+
+      // Group by userId from dimensions
+      const userGroups = new Map<string, number>()
+      const trendMap = new Map<string, number>()
+
+      for (const event of events) {
+        const dims = (event.dimensions as any) || {}
+        const userId = dims.userId
+        if (userId) {
+          const amount = parseFloat(event.amountEur.toString())
+          userGroups.set(userId, (userGroups.get(userId) || 0) + amount)
+        }
+      }
+
+      for (const event of trendEvents) {
+        const dims = (event.dimensions as any) || {}
+        const userId = dims.userId
+        if (userId) {
+          const amount = parseFloat(event.amountEur.toString())
+          trendMap.set(userId, (trendMap.get(userId) || 0) + amount)
+        }
+      }
+
+      // Get top 10 users
+      const topUsers = Array.from(userGroups.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+
+      const userIds = topUsers.map(([id]) => id)
       const users = await prisma.user.findMany({
         where: { id: { in: userIds } },
         select: { id: true, email: true, name: true },
       })
       const usersMap = new Map(users.map((u) => [u.id, u.name || u.email]))
 
-      const trendGroups = await prisma.costEvent.groupBy({
-        by: ['userId'],
-        where: {
-          ...trendWhere,
-          userId: { in: userIds },
-        },
-        _sum: { amountEur: true },
-      })
-      const trendMap = new Map(trendGroups.map((g) => [g.userId!, g._sum.amountEur ? parseFloat(g._sum.amountEur.toString()) : 0]))
-
-      results = userGroups.map((group) => {
-        const amountEUR = group._sum.amountEur ? parseFloat(group._sum.amountEur.toString()) : 0
-        const trend7dEUR = trendMap.get(group.userId!) || 0
+      results = topUsers.map(([userId, amountEUR]) => {
+        const trend7dEUR = trendMap.get(userId) || 0
         const trend7d = trend7dEUR > 0 ? ((amountEUR - trend7dEUR) / trend7dEUR) * 100 : (amountEUR > 0 ? 100 : 0)
         return {
-          id: group.userId!,
-          name: usersMap.get(group.userId!) || 'Unknown',
+          id: userId,
+          name: usersMap.get(userId) || 'Unknown',
           amountEUR,
           trend7d: Math.round(trend7d * 10) / 10,
         }
