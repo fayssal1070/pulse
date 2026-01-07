@@ -418,6 +418,8 @@ export async function processAiRequest(
         rawRef: {
           requestId: apiResponse.requestId,
           provider: provider,
+          overQuota: quotaCheck.isOver,
+          quotaPercentage: quotaCheck.percentage,
         },
       },
     })
