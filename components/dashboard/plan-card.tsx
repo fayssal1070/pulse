@@ -49,10 +49,10 @@ export default function PlanCard() {
           )}
         </div>
         <Link
-          href="/billing"
+          href="/pricing"
           className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700"
         >
-          {planInfo.plan === 'STARTER' ? 'Upgrade' : 'Manage'}
+          {planInfo.plan === 'STARTER' ? 'Upgrade' : 'View Plans'}
         </Link>
       </div>
     </div>

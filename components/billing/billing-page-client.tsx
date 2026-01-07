@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { getPlanInfo, PlanInfo } from '@/lib/billing/plan-client'
 
 interface BillingPageClientProps {
   organizationId: string
@@ -14,10 +15,21 @@ export default function BillingPageClient({ organizationId, canceled }: BillingP
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [orgData, setOrgData] = useState<any>(null)
+  const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null)
 
   useEffect(() => {
     fetchOrgData()
+    fetchPlanInfo()
   }, [organizationId])
+
+  async function fetchPlanInfo() {
+    try {
+      const info = await getPlanInfo()
+      setPlanInfo(info)
+    } catch (err) {
+      // Silent fail
+    }
+  }
 
   async function fetchOrgData() {
     try {
@@ -108,6 +120,73 @@ export default function BillingPageClient({ organizationId, canceled }: BillingP
         </div>
       )}
 
+      {/* Usage & Quota Section (PR30/PR31) */}
+      {planInfo?.usage && (
+        <div className="bg-white shadow rounded-lg p-6 border-l-4 border-blue-500">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Usage & Billing</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            <strong>No surprise billing.</strong> You see your usage live, updated in real-time.
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <p className="text-sm text-gray-600">Included Quota</p>
+              <p className="text-2xl font-bold text-gray-900">€{planInfo.usage.includedSpendEUR.toFixed(2)}</p>
+              <p className="text-xs text-gray-500 mt-1">per month</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Current Usage</p>
+              <p className={`text-2xl font-bold ${planInfo.usage.isOverQuota ? 'text-red-600' : 'text-gray-900'}`}>
+                €{planInfo.usage.totalSpendEUR.toFixed(2)}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                {planInfo.usage.quotaPercentage.toFixed(1)}% of quota
+              </p>
+            </div>
+            {planInfo.usage.isOverQuota ? (
+              <div>
+                <p className="text-sm text-gray-600">Estimated Overage</p>
+                <p className="text-2xl font-bold text-orange-600">€{planInfo.usage.overageAmountEUR.toFixed(2)}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {planInfo.usage.overageSpendEUR.toFixed(2)}€ × {planInfo.entitlements.overagePricePerEUR.toFixed(2)}x
+                </p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-sm text-gray-600">Remaining</p>
+                <p className="text-2xl font-bold text-green-600">
+                  €{(planInfo.usage.includedSpendEUR - planInfo.usage.totalSpendEUR).toFixed(2)}
+                </p>
+              </div>
+            )}
+          </div>
+          
+          {/* Progress bar */}
+          <div className="mt-4">
+            <div className="w-full bg-gray-200 rounded-full h-3">
+              <div
+                className={`h-3 rounded-full ${
+                  planInfo.usage.quotaPercentage >= 200
+                    ? 'bg-red-500'
+                    : planInfo.usage.quotaPercentage >= 100
+                    ? 'bg-orange-500'
+                    : planInfo.usage.quotaPercentage >= 80
+                    ? 'bg-yellow-500'
+                    : 'bg-green-500'
+                }`}
+                style={{ width: `${Math.min(planInfo.usage.quotaPercentage, 200)}%` }}
+              />
+            </div>
+          </div>
+          
+          {planInfo.entitlements.allowOverage && planInfo.usage.isOverQuota && (
+            <p className="text-xs text-gray-600 mt-3 italic">
+              Usage beyond your included quota is automatically billed at the end of each month — no service interruptions.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="bg-white shadow rounded-lg p-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">Current Plan</h2>
         <div className="space-y-3">
@@ -152,24 +231,12 @@ export default function BillingPageClient({ organizationId, canceled }: BillingP
           <div>
             <button
               onClick={() => {
-                const planSelect = window.prompt('Select plan:\n1. STARTER\n2. PRO\n3. BUSINESS')
-                if (planSelect) {
-                  const planMap: Record<string, string> = {
-                    '1': 'STARTER',
-                    '2': 'PRO',
-                    '3': 'BUSINESS',
-                  }
-                  const selectedPlan = planMap[planSelect.trim()]
-                  if (selectedPlan) {
-                    handleCheckout(selectedPlan)
-                  }
-                }
+                router.push('/pricing')
               }}
-              disabled={loading}
               data-testid="billing-checkout"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              {loading ? 'Processing...' : 'Upgrade / Change Plan'}
+              View Pricing & Upgrade
             </button>
           </div>
 

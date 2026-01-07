@@ -63,10 +63,10 @@ export function UpgradeRequired({
               Go to Billing
             </Link>
             <Link
-              href="/billing/preview"
+              href="/pricing"
               className="inline-flex items-center rounded-md border border-yellow-300 bg-white px-3 py-2 text-sm font-medium text-yellow-700 shadow-sm hover:bg-yellow-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-600"
             >
-              View Plans
+              View Pricing
             </Link>
           </div>
         </div>

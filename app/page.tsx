@@ -22,8 +22,14 @@ export default function LandingPage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link
-                  href="/demo"
+                  href="/pricing"
                   className="px-8 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  View Pricing
+                </Link>
+                <Link
+                  href="/demo"
+                  className="px-8 py-3 bg-white text-blue-600 font-medium rounded-md border-2 border-blue-600 hover:bg-blue-50 transition-colors"
                 >
                   Try Demo
                 </Link>
@@ -32,12 +38,6 @@ export default function LandingPage() {
                   className="px-8 py-3 bg-white text-blue-600 font-medium rounded-md border-2 border-blue-600 hover:bg-blue-50 transition-colors"
                 >
                   Request Demo
-                </Link>
-                <Link
-                  href="/contact?action=waitlist"
-                  className="px-8 py-3 bg-white text-blue-600 font-medium rounded-md border-2 border-blue-600 hover:bg-blue-50 transition-colors"
-                >
-                  Join Waitlist
                 </Link>
               </div>
             </div>
