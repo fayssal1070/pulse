@@ -32,6 +32,9 @@ model Organization {
   currentPeriodEnd        DateTime?
   cancelAtPeriodEnd       Boolean                  @default(false)
   trialEndsAt             DateTime?
+  // Seats (seat-based billing)
+  seatLimit               Int                      @default(1) // Limit based on plan (STARTER: 1, PRO: 5, BUSINESS: 25)
+  seatEnforcement         Boolean                  @default(true) // Whether to enforce seat limits
   // AWS CUR configuration
   awsCurEnabled           Boolean                  @default(false)
   awsCurBucket            String?
@@ -80,6 +83,9 @@ model Membership {
   orgId        String
   role         String       @default("member")
   teamId       String? // Team assignment
+  status       String       @default("active") // "active", "invited", "suspended"
+  invitedAt    DateTime?
+  activatedAt  DateTime?
   createdAt    DateTime     @default(now())
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -88,6 +94,8 @@ model Membership {
   @@unique([userId, orgId])
   @@index([orgId])
   @@index([teamId])
+  @@index([status])
+  @@index([orgId, status])
 }
 
 model CostRecord {

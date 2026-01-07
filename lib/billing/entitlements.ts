@@ -21,6 +21,7 @@ export type Feature =
   | 'api_keys_count'
   | 'api_keys_rotation'
   | 'api_keys_advanced_limits'
+  | 'seats'
 
 export interface Entitlements {
   // AI Routing
@@ -48,6 +49,9 @@ export interface Entitlements {
   maxApiKeys: number
   apiKeyRotationEnabled: boolean
   apiKeyAdvancedLimitsEnabled: boolean
+  
+  // Seats (PR29)
+  seatLimit: number
 }
 
 const ENTITLEMENTS: Record<Plan, Entitlements> = {
@@ -62,6 +66,7 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
     webhooksEnabled: false,
     costsExportEnabled: false, // Or limited
     usageExportEnabled: true,
+    seatLimit: 1,
     maxRetentionDays: 7,
     maxApiKeys: 3,
     apiKeyRotationEnabled: false,
@@ -78,6 +83,7 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
     webhooksEnabled: false,
     costsExportEnabled: true,
     usageExportEnabled: true,
+    seatLimit: 5,
     maxRetentionDays: 30,
     maxApiKeys: 20,
     apiKeyRotationEnabled: true,
@@ -335,5 +341,71 @@ export function isPlanAtLeast(currentPlan: Plan, minimumPlan: Plan): boolean {
   const currentIndex = hierarchy.indexOf(currentPlan)
   const minimumIndex = hierarchy.indexOf(minimumPlan)
   return currentIndex >= minimumIndex
+}
+
+/**
+ * Get seat limit for a plan (PR29)
+ */
+export function getSeatLimit(plan: Plan): number {
+  return ENTITLEMENTS[plan].seatLimit
+}
+
+/**
+ * Check if seats are available for an organization (PR29)
+ * Throws EntitlementError if limit reached
+ */
+export async function assertSeatAvailable(orgId: string): Promise<void> {
+  const { prisma } = await import('@/lib/prisma')
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: {
+      plan: true,
+      seatLimit: true,
+      seatEnforcement: true,
+    },
+  })
+
+  if (!org) {
+    throw new Error('Organization not found')
+  }
+
+  if (!org.seatEnforcement) {
+    // Enforcement disabled, allow
+    return
+  }
+
+  const plan = await getOrgPlan(orgId)
+  const limit = org.seatLimit || getSeatLimit(plan)
+
+  // Count active memberships
+  const used = await prisma.membership.count({
+    where: {
+      orgId,
+      status: 'active',
+    },
+  })
+
+  if (used >= limit) {
+    // Determine required plan
+    let requiredPlan: Plan = 'PRO'
+    if (plan === 'STARTER') {
+      requiredPlan = 'PRO'
+    } else if (plan === 'PRO') {
+      requiredPlan = 'BUSINESS'
+    } else {
+      // Already at BUSINESS, but still at limit
+      throw new EntitlementError(
+        'seats',
+        `Seat limit reached (${used}/${limit}). Contact support to increase your limit.`,
+        'BUSINESS'
+      )
+    }
+
+    throw new EntitlementError(
+      'seats',
+      `Seat limit reached (${used}/${limit}). Upgrade to ${requiredPlan} plan to add more seats.`,
+      requiredPlan
+    )
+  }
 }
 
