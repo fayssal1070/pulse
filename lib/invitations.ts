@@ -62,18 +62,25 @@ export async function acceptInvitation(token: string, userId: string) {
     throw new Error('User is already a member of this organization')
   }
 
-  // Créer le membership et marquer l'invitation comme acceptée
+  // PR29: Check seat availability before accepting
+  const { assertSeatAvailable } = await import('./billing/entitlements')
+  await assertSeatAvailable(invitation.orgId)
+
+  // Créer le membership avec status='active' et marquer l'invitation comme acceptée
+  const now = new Date()
   await prisma.$transaction([
     prisma.membership.create({
       data: {
         userId,
         orgId: invitation.orgId,
         role: 'member',
+        status: 'active',
+        activatedAt: now,
       },
     }),
     prisma.invitation.update({
       where: { id: invitation.id },
-      data: { acceptedAt: new Date() },
+      data: { acceptedAt: now },
     }),
   ])
 

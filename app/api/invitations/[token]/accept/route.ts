@@ -30,8 +30,24 @@ export async function POST(
       success: true,
       organizationId: invitation.orgId,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Invitation acceptance error:', error)
+    
+    // PR29: Handle EntitlementError (upgrade_required)
+    if (error.name === 'EntitlementError' || error.code === 'upgrade_required') {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: 'upgrade_required',
+          feature: error.feature || 'seats',
+          message: error.message,
+          plan: error.plan || 'STARTER',
+          required: error.requiredPlan || 'PRO',
+        },
+        { status: 402 }
+      )
+    }
+    
     const errorMessage = error instanceof Error ? error.message : 'Internal server error'
     return NextResponse.json(
       { error: errorMessage },

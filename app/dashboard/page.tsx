@@ -26,6 +26,7 @@ import OnboardingBanner from '@/components/onboarding/onboarding-banner'
 import DiagnosticsCard from '@/components/dashboard/diagnostics-card'
 import AISpendCard from '@/components/dashboard/ai-spend-card'
 import PlanCard from '@/components/dashboard/plan-card'
+import SeatsCard from '@/components/dashboard/seats-card'
 import Link from 'next/link'
 import { isFinance } from '@/lib/admin-helpers'
 
@@ -118,6 +119,13 @@ export default async function DashboardPage({
             {isAdminUser && (
               <div className="mb-6">
                 <PlanCard />
+              </div>
+            )}
+
+            {/* Seats Card (Admin only) */}
+            {isAdminUser && (
+              <div className="mb-6">
+                <SeatsCard />
               </div>
             )}
 
