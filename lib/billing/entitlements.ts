@@ -76,6 +76,9 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
     maxApiKeys: 3,
     apiKeyRotationEnabled: false,
     apiKeyAdvancedLimitsEnabled: false,
+    includedMonthlySpendEUR: 20,
+    overagePricePerEUR: 1.5, // 50% markup for STARTER
+    allowOverage: false, // STARTER: hard block at quota
   },
   PRO: {
     maxProviders: 3,
@@ -93,6 +96,9 @@ const ENTITLEMENTS: Record<Plan, Entitlements> = {
     maxApiKeys: 20,
     apiKeyRotationEnabled: true,
     apiKeyAdvancedLimitsEnabled: true,
+    includedMonthlySpendEUR: 200,
+    overagePricePerEUR: 1.20, // 20% markup for PRO
+    allowOverage: true, // PRO: allow overage
   },
   BUSINESS: {
     maxProviders: 10,
