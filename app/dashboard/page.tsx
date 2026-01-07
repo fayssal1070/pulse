@@ -25,6 +25,7 @@ import OnboardingWarning from '@/components/directory/onboarding-warning'
 import OnboardingBanner from '@/components/onboarding/onboarding-banner'
 import DiagnosticsCard from '@/components/dashboard/diagnostics-card'
 import AISpendCard from '@/components/dashboard/ai-spend-card'
+import PlanCard from '@/components/dashboard/plan-card'
 import Link from 'next/link'
 import { isFinance } from '@/lib/admin-helpers'
 

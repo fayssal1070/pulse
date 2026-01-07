@@ -4,6 +4,7 @@ import { requireActiveOrgOrRedirect } from '@/lib/organizations/require-active-o
 import { isAdmin } from '@/lib/admin-helpers'
 import AppShell from '@/components/app-shell'
 import WebhooksAdminClient from '@/components/webhooks-admin-client'
+import { PlanStatusWrapper } from '@/components/billing/plan-status-wrapper'
 import { prisma } from '@/lib/prisma'
 
 export default async function WebhooksAdminPage() {
@@ -45,7 +46,13 @@ export default async function WebhooksAdminPage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-6" data-testid="webhooks-page-title">
             Webhooks
           </h1>
-          <WebhooksAdminClient organizationId={activeOrg.id} initialWebhooks={webhooks} />
+          <PlanStatusWrapper
+            requiredPlan="BUSINESS"
+            feature="webhooks"
+            message="Webhooks require the BUSINESS plan"
+          >
+            <WebhooksAdminClient organizationId={activeOrg.id} initialWebhooks={webhooks} />
+          </PlanStatusWrapper>
         </div>
       </div>
     </AppShell>

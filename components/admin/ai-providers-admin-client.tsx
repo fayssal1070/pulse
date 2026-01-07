@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { fetchJson } from '@/lib/http/fetch-json'
+import { UpgradeRequiredError } from '@/lib/http/upgrade-error'
+import { UpgradeRequired } from '@/components/billing/upgrade-required'
 
 interface AiProviderConnection {
   id: string
@@ -69,19 +72,21 @@ export default function AiProvidersAdminClient({ organizationId }: AiProvidersAd
 
   const loadData = async () => {
     setLoading(true)
+    setUpgradeError(null)
     try {
-      const [providersRes, routesRes] = await Promise.all([
-        fetch('/api/admin/ai/providers'),
-        fetch('/api/admin/ai/routes'),
+      const [providersData, routesData] = await Promise.all([
+        fetchJson<{ connections: AiProviderConnection[] }>('/api/admin/ai/providers'),
+        fetchJson<{ routes: AiModelRoute[] }>('/api/admin/ai/routes'),
       ])
-
-      const providersData = await providersRes.json()
-      const routesData = await routesRes.json()
 
       setConnections(providersData.connections || [])
       setRoutes(routesData.routes || [])
     } catch (error) {
-      showToast('error', 'Failed to load data')
+      if (error instanceof UpgradeRequiredError) {
+        setUpgradeError(error)
+      } else {
+        showToast('error', 'Failed to load data')
+      }
     } finally {
       setLoading(false)
     }
@@ -89,15 +94,15 @@ export default function AiProvidersAdminClient({ organizationId }: AiProvidersAd
 
   const handleAddProvider = async (e: React.FormEvent) => {
     e.preventDefault()
+    setUpgradeError(null)
     try {
-      const res = await fetch('/api/admin/ai/providers', {
+      await fetchJson('/api/admin/ai/providers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(providerForm),
       })
 
-      const data = await res.json()
-      if (res.ok) {
+      // Success
         showToast('success', 'Provider connection created')
         setProviderForm({ provider: 'OPENAI', name: '', apiKey: '' })
         setShowAddProvider(false)
@@ -171,25 +176,25 @@ export default function AiProvidersAdminClient({ organizationId }: AiProvidersAd
 
   const handleAddRoute = async (e: React.FormEvent) => {
     e.preventDefault()
+    setUpgradeError(null)
     try {
-      const res = await fetch('/api/admin/ai/routes', {
+      await fetchJson('/api/admin/ai/routes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(routeForm),
       })
 
-      const data = await res.json()
-      if (res.ok) {
-        showToast('success', 'Model route created')
-        setRouteForm({ provider: 'OPENAI', model: '', priority: 100, enabled: true })
-        setShowAddRoute(false)
-        loadData()
-        router.refresh()
-      } else {
-        showToast('error', data.error || 'Failed to create route')
-      }
+      showToast('success', 'Model route created')
+      setRouteForm({ provider: 'OPENAI', model: '', priority: 100, enabled: true })
+      setShowAddRoute(false)
+      loadData()
+      router.refresh()
     } catch (error) {
-      showToast('error', 'Failed to create route')
+      if (error instanceof UpgradeRequiredError) {
+        setUpgradeError(error)
+      } else {
+        showToast('error', error instanceof Error ? error.message : 'Failed to create route')
+      }
     }
   }
 
