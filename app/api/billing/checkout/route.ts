@@ -17,9 +17,23 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth()
     await requireAdmin()
 
-    const activeOrg = await getActiveOrganization(user.id)
-    if (!activeOrg) {
+    const activeOrgBasic = await getActiveOrganization(user.id)
+    if (!activeOrgBasic) {
       return NextResponse.json({ error: 'No active organization' }, { status: 400 })
+    }
+
+    // Fetch full organization with Stripe fields
+    const activeOrg = await prisma.organization.findUnique({
+      where: { id: activeOrgBasic.id },
+      select: {
+        id: true,
+        name: true,
+        stripeCustomerId: true,
+      },
+    })
+
+    if (!activeOrg) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
     }
 
     const body = await request.json()

@@ -8,15 +8,29 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { getActiveOrganization } from '@/lib/active-org'
 import { requireAdmin } from '@/lib/admin-helpers'
 import { getStripeClient } from '@/lib/stripe/client'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth()
     await requireAdmin()
 
-    const activeOrg = await getActiveOrganization(user.id)
-    if (!activeOrg) {
+    const activeOrgBasic = await getActiveOrganization(user.id)
+    if (!activeOrgBasic) {
       return NextResponse.json({ error: 'No active organization' }, { status: 400 })
+    }
+
+    // Fetch full organization with Stripe fields
+    const activeOrg = await prisma.organization.findUnique({
+      where: { id: activeOrgBasic.id },
+      select: {
+        id: true,
+        stripeCustomerId: true,
+      },
+    })
+
+    if (!activeOrg) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
     }
 
     if (!activeOrg.stripeCustomerId) {
