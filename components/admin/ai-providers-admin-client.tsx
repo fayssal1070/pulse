@@ -45,6 +45,7 @@ export default function AiProvidersAdminClient({ organizationId }: AiProvidersAd
   const [routes, setRoutes] = useState<AiModelRoute[]>([])
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [upgradeError, setUpgradeError] = useState<UpgradeRequiredError | null>(null)
 
   const [showAddProvider, setShowAddProvider] = useState(false)
   const [providerForm, setProviderForm] = useState({
