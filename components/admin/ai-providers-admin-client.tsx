@@ -102,17 +102,17 @@ export default function AiProvidersAdminClient({ organizationId }: AiProvidersAd
         body: JSON.stringify(providerForm),
       })
 
-      // Success
-        showToast('success', 'Provider connection created')
-        setProviderForm({ provider: 'OPENAI', name: '', apiKey: '' })
-        setShowAddProvider(false)
-        loadData()
-        router.refresh()
-      } else {
-        showToast('error', data.error || 'Failed to create provider')
-      }
+      showToast('success', 'Provider connection created')
+      setProviderForm({ provider: 'OPENAI', name: '', apiKey: '' })
+      setShowAddProvider(false)
+      loadData()
+      router.refresh()
     } catch (error) {
-      showToast('error', 'Failed to create provider')
+      if (error instanceof UpgradeRequiredError) {
+        setUpgradeError(error)
+      } else {
+        showToast('error', error instanceof Error ? error.message : 'Failed to create provider')
+      }
     }
   }
 
