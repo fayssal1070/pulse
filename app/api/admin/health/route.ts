@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-helpers'
 import { isAdmin } from '@/lib/admin-helpers'
 import { prisma } from '@/lib/prisma'
+import { getActiveOrganization } from '@/lib/active-org'
+import { getOrgPlan, getEntitlements } from '@/lib/billing/entitlements'
 
 /**
  * Admin-only health check endpoint
@@ -54,6 +56,7 @@ export async function GET(request: Request) {
             lastUsedNewest: null as string | null,
           },
           recentKeyAudits: [] as any[],
+          planStatus: null as any,
         }
 
     // Test DB connection and get latency
@@ -299,6 +302,33 @@ export async function GET(request: Request) {
       }))
     } catch (error: any) {
       // Ignore errors fetching recent errors
+    }
+
+    // Get plan status for active organization (if available)
+    try {
+      const activeOrg = await getActiveOrganization(user.id)
+      if (activeOrg) {
+        const plan = await getOrgPlan(activeOrg.id)
+        const entitlements = getEntitlements(plan)
+        health.planStatus = {
+          plan,
+          entitlements: {
+            maxProviders: entitlements.maxProviders,
+            maxRoutes: entitlements.maxRoutes,
+            maxAlertRules: entitlements.maxAlertRules,
+            telegramEnabled: entitlements.telegramEnabled,
+            slackEnabled: entitlements.slackEnabled,
+            teamsEnabled: entitlements.teamsEnabled,
+            webhooksEnabled: entitlements.webhooksEnabled,
+            costsExportEnabled: entitlements.costsExportEnabled,
+            maxRetentionDays: entitlements.maxRetentionDays,
+            maxApiKeys: entitlements.maxApiKeys,
+            apiKeyRotationEnabled: entitlements.apiKeyRotationEnabled,
+          },
+        }
+      }
+    } catch (error: any) {
+      // Ignore errors fetching plan status
     }
 
     return NextResponse.json(health)

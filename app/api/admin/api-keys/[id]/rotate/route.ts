@@ -8,6 +8,7 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { getActiveOrganization } from '@/lib/active-org'
 import { prisma } from '@/lib/prisma'
 import { randomBytes, createHash } from 'crypto'
+import { getOrgPlan, getEntitlements, assertEntitlement, EntitlementError } from '@/lib/billing/entitlements'
 
 export async function POST(
   request: NextRequest,
@@ -54,6 +55,29 @@ export async function POST(
       if (existingKey.createdByUserId !== user.id) {
         return NextResponse.json({ error: 'Can only rotate your own API keys' }, { status: 403 })
       }
+    }
+
+    // Check entitlements: API key rotation
+    try {
+      const plan = await getOrgPlan(activeOrg.id)
+      const entitlements = getEntitlements(plan)
+      assertEntitlement(entitlements, 'api_keys_rotation')
+    } catch (error: any) {
+      if (error instanceof EntitlementError) {
+        const plan = await getOrgPlan(activeOrg.id)
+        return NextResponse.json(
+          {
+            ok: false,
+            code: 'upgrade_required',
+            feature: error.feature,
+            plan,
+            required: error.requiredPlan,
+            message: error.message,
+          },
+          { status: 403 }
+        )
+      }
+      throw error
     }
 
     // Generate new key secret

@@ -79,6 +79,40 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { emailEnabled, telegramEnabled, telegramChatId, slackEnabled, teamsEnabled } = body
 
+    // Check entitlements for notification channels
+    try {
+      const { getOrgPlan, getEntitlements, assertEntitlement, EntitlementError } = await import('@/lib/billing/entitlements')
+      const plan = await getOrgPlan(activeOrg.id)
+      const entitlements = getEntitlements(plan)
+      
+      if (telegramEnabled) {
+        assertEntitlement(entitlements, 'telegram_notifications')
+      }
+      if (slackEnabled) {
+        assertEntitlement(entitlements, 'slack_notifications')
+      }
+      if (teamsEnabled) {
+        assertEntitlement(entitlements, 'teams_notifications')
+      }
+    } catch (error: any) {
+      const { EntitlementError: EntitlementErrorClass, getOrgPlan: getOrgPlanFn } = await import('@/lib/billing/entitlements')
+      if (error instanceof EntitlementErrorClass) {
+        const plan = await getOrgPlanFn(activeOrg.id)
+        return NextResponse.json(
+          {
+            ok: false,
+            code: 'upgrade_required',
+            feature: error.feature,
+            plan,
+            required: error.requiredPlan,
+            message: error.message,
+          },
+          { status: 403 }
+        )
+      }
+      throw error
+    }
+
     // Validate telegramChatId if telegramEnabled
     if (telegramEnabled && !telegramChatId) {
       return NextResponse.json({ error: 'Telegram Chat ID is required when Telegram is enabled' }, { status: 400 })

@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { randomBytes } from 'crypto'
 import { dispatchWebhook } from '@/lib/webhooks/dispatcher'
 import { encryptWebhookSecret } from '@/lib/webhooks/crypto'
+import { getOrgPlan, getEntitlements, assertEntitlement, EntitlementError } from '@/lib/billing/entitlements'
 
 export async function GET(request: NextRequest) {
   try {
@@ -62,6 +63,29 @@ export async function POST(request: NextRequest) {
         { error: 'url and events (array) are required' },
         { status: 400 }
       )
+    }
+
+    // Check entitlements: webhooks
+    try {
+      const plan = await getOrgPlan(activeOrg.id)
+      const entitlements = getEntitlements(plan)
+      assertEntitlement(entitlements, 'webhooks')
+    } catch (error: any) {
+      if (error instanceof EntitlementError) {
+        const plan = await getOrgPlan(activeOrg.id)
+        return NextResponse.json(
+          {
+            ok: false,
+            code: 'upgrade_required',
+            feature: error.feature,
+            plan,
+            required: error.requiredPlan,
+            message: error.message,
+          },
+          { status: 403 }
+        )
+      }
+      throw error
     }
 
     // Generate secret (32 bytes, hex) and encrypt

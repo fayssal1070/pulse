@@ -11,6 +11,7 @@ import { requireRole } from '@/lib/auth/rbac'
 import { prisma } from '@/lib/prisma'
 import { randomBytes, createHash } from 'crypto'
 import { Prisma } from '@prisma/client'
+import { getOrgPlan, getEntitlements, assertEntitlement, EntitlementError } from '@/lib/billing/entitlements'
 
 export async function GET(request: NextRequest) {
   try {
@@ -125,6 +126,42 @@ export async function POST(request: NextRequest) {
       monthlyCostLimitEur,
       expiresAt,
     } = body
+
+    // Check entitlements: max API keys
+    try {
+      const plan = await getOrgPlan(activeOrg.id)
+      const entitlements = getEntitlements(plan)
+      
+      // Count current API keys
+      const currentKeyCount = await prisma.aiGatewayKey.count({
+        where: { orgId: activeOrg.id, status: 'active' },
+      })
+      
+      assertEntitlement(entitlements, 'api_keys_count', {
+        currentValue: currentKeyCount,
+      })
+      
+      // Check advanced limits if used
+      if (rateLimitRpm || dailyCostLimitEur || monthlyCostLimitEur) {
+        assertEntitlement(entitlements, 'api_keys_advanced_limits')
+      }
+    } catch (error: any) {
+      if (error instanceof EntitlementError) {
+        const plan = await getOrgPlan(activeOrg.id)
+        return NextResponse.json(
+          {
+            ok: false,
+            code: 'upgrade_required',
+            feature: error.feature,
+            plan,
+            required: error.requiredPlan,
+            message: error.message,
+          },
+          { status: 403 }
+        )
+      }
+      throw error
+    }
 
     // Generate API key
     const keyValue = `pulse_key_${randomBytes(32).toString('hex')}`

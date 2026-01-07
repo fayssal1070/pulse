@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { requireActiveOrgOrRedirect } from '@/lib/organizations/require-active-org'
 import { getUserRole } from '@/lib/auth/rbac'
 import { exportCostEventsCsv } from '@/lib/costs/query'
+import { getOrgPlan, getEntitlements, assertEntitlement, EntitlementError } from '@/lib/billing/entitlements'
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,6 +29,29 @@ export async function GET(request: NextRequest) {
       search: searchParams.get('search') || undefined,
     }
 
+    // Check entitlements: costs export
+    try {
+      const plan = await getOrgPlan(activeOrg.id)
+      const entitlements = getEntitlements(plan)
+      assertEntitlement(entitlements, 'costs_export')
+    } catch (error: any) {
+      if (error instanceof EntitlementError) {
+        const plan = await getOrgPlan(activeOrg.id)
+        return NextResponse.json(
+          {
+            ok: false,
+            code: 'upgrade_required',
+            feature: error.feature,
+            plan,
+            required: error.requiredPlan,
+            message: error.message,
+          },
+          { status: 403 }
+        )
+      }
+      throw error
+    }
+
     // RBAC: users can only export their own costs
     const userIdForRBAC = role === 'user' ? user.id : undefined
 
@@ -46,6 +70,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
   }
 }
+
 
 
 

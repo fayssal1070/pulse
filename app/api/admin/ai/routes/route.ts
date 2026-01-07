@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/admin-helpers'
 import { getActiveOrganization } from '@/lib/active-org'
 import { prisma } from '@/lib/prisma'
 import { AiProvider, AiProviderConnectionStatus } from '@prisma/client'
+import { getOrgPlan, getEntitlements, assertEntitlement, EntitlementError } from '@/lib/billing/entitlements'
 
 /**
  * GET /api/admin/ai/routes
@@ -96,6 +97,37 @@ export async function POST(request: NextRequest) {
         { error: `Route for model "${model}" with provider ${provider} already exists` },
         { status: 400 }
       )
+    }
+
+    // Check entitlements: max routes
+    try {
+      const plan = await getOrgPlan(activeOrg.id)
+      const entitlements = getEntitlements(plan)
+      
+      // Count current routes
+      const currentRouteCount = await prisma.aiModelRoute.count({
+        where: { orgId: activeOrg.id },
+      })
+      
+      assertEntitlement(entitlements, 'ai_routing_routes', {
+        currentValue: currentRouteCount,
+      })
+    } catch (error: any) {
+      if (error instanceof EntitlementError) {
+        const plan = await getOrgPlan(activeOrg.id)
+        return NextResponse.json(
+          {
+            ok: false,
+            code: 'upgrade_required',
+            feature: error.feature,
+            plan,
+            required: error.requiredPlan,
+            message: error.message,
+          },
+          { status: 403 }
+        )
+      }
+      throw error
     }
 
     const route = await prisma.aiModelRoute.create({

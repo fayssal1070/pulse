@@ -5,6 +5,7 @@ import { getActiveOrganization } from '@/lib/active-org'
 import { prisma } from '@/lib/prisma'
 import { encryptSecret } from '@/lib/ai/providers/crypto'
 import { AiProvider, AiProviderConnectionStatus } from '@prisma/client'
+import { getOrgPlan, getEntitlements, assertEntitlement, EntitlementError } from '@/lib/billing/entitlements'
 
 /**
  * GET /api/admin/ai/providers
@@ -97,6 +98,37 @@ export async function POST(request: NextRequest) {
         { error: `Provider connection with name "${name}" already exists for ${provider}` },
         { status: 400 }
       )
+    }
+
+    // Check entitlements: max providers
+    try {
+      const plan = await getOrgPlan(activeOrg.id)
+      const entitlements = getEntitlements(plan)
+      
+      // Count current providers
+      const currentProviderCount = await prisma.aiProviderConnection.count({
+        where: { orgId: activeOrg.id },
+      })
+      
+      assertEntitlement(entitlements, 'ai_routing_providers', {
+        currentValue: currentProviderCount,
+      })
+    } catch (error: any) {
+      if (error instanceof EntitlementError) {
+        const plan = await getOrgPlan(activeOrg.id)
+        return NextResponse.json(
+          {
+            ok: false,
+            code: 'upgrade_required',
+            feature: error.feature,
+            plan,
+            required: error.requiredPlan,
+            message: error.message,
+          },
+          { status: 403 }
+        )
+      }
+      throw error
     }
 
     const connection = await prisma.aiProviderConnection.create({

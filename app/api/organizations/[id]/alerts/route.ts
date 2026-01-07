@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-helpers'
 import { getOrganizationById } from '@/lib/organizations'
 import { prisma } from '@/lib/prisma'
+import { getOrgPlan, getEntitlements, assertEntitlement, EntitlementError } from '@/lib/billing/entitlements'
 
 // GET: List all alerts for an organization
 export async function GET(
@@ -57,23 +58,6 @@ export async function POST(
       )
     }
 
-    // Check entitlements
-    try {
-      const { assertCanCreateAlert } = await import('@/lib/entitlements')
-      await assertCanCreateAlert(id)
-    } catch (error: any) {
-      if (error.message?.includes('LIMIT_REACHED')) {
-        return NextResponse.json(
-          {
-            error: error.message,
-            code: 'LIMIT_REACHED',
-          },
-          { status: 402 }
-        )
-      }
-      throw error
-    }
-
     const body = await request.json()
     const {
       name,
@@ -85,6 +69,45 @@ export async function POST(
       enabled = true,
       notifyEmail = false,
     } = body
+
+    // Check entitlements: max alert rules and allowed types
+    try {
+      const plan = await getOrgPlan(id)
+      const entitlements = getEntitlements(plan)
+      
+      // Count current alert rules
+      const currentAlertCount = await prisma.alertRule.count({
+        where: { orgId: id },
+      })
+      
+      // Check max rules
+      assertEntitlement(entitlements, 'alert_rules', {
+        currentValue: currentAlertCount,
+      })
+      
+      // Check allowed alert types
+      if (type) {
+        assertEntitlement(entitlements, 'alert_rule_type', {
+          alertType: type,
+        })
+      }
+    } catch (error: any) {
+      if (error instanceof EntitlementError) {
+        const plan = await getOrgPlan(id)
+        return NextResponse.json(
+          {
+            ok: false,
+            code: 'upgrade_required',
+            feature: error.feature,
+            plan,
+            required: error.requiredPlan,
+            message: error.message,
+          },
+          { status: 403 }
+        )
+      }
+      throw error
+    }
 
     // Validation
     if (!name || !type || !thresholdEUR || thresholdEUR <= 0) {
